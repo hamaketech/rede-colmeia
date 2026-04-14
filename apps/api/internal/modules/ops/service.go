@@ -6,20 +6,20 @@ import (
 )
 
 type TransparencySummary struct {
-	Contributors     int       `json:"contributors"`
-	Partners         int       `json:"partners"`
-	FamiliesSupported int      `json:"familiesSupported"`
-	TotalRaisedCents int       `json:"totalRaisedCents"`
-	BasketsDelivered int       `json:"basketsDelivered"`
-	RegionsServed    int       `json:"regionsServed"`
-	LastUpdated      time.Time `json:"lastUpdated"`
+	Contributors      int       `json:"contributors"`
+	Partners          int       `json:"partners"`
+	FamiliesSupported int       `json:"familiesSupported"`
+	TotalRaisedCents  int       `json:"totalRaisedCents"`
+	BasketsDelivered  int       `json:"basketsDelivered"`
+	RegionsServed     int       `json:"regionsServed"`
+	LastUpdated       time.Time `json:"lastUpdated"`
 }
 
 type PipelineSnapshot struct {
-	Queued      int `json:"queued"`
-	Preparing   int `json:"preparing"`
-	InDelivery  int `json:"inDelivery"`
-	Delivered   int `json:"delivered"`
+	Queued     int `json:"queued"`
+	Preparing  int `json:"preparing"`
+	InDelivery int `json:"inDelivery"`
+	Delivered  int `json:"delivered"`
 }
 
 type OperationalIndicators struct {

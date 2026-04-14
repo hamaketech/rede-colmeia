@@ -67,7 +67,7 @@ type InMemoryRepository struct {
 	credentials map[string]StoredCredential
 	sessions    map[string]StoredSession
 	resetTokens map[string]StoredPasswordResetToken
-	throttles  map[string]time.Time
+	throttles   map[string]time.Time
 	events      []AuthEvent
 	mutex       sync.RWMutex
 }

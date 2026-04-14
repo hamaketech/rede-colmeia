@@ -16,14 +16,14 @@ import (
 )
 
 var (
-	ErrSessionCookieMissing = errors.New("session cookie is required")
-	ErrInvalidSession       = errors.New("session is invalid")
-	ErrInvalidCredentials   = errors.New("email or password is invalid")
-	ErrInvalidRole          = errors.New("role is invalid")
-	ErrInvalidEmail         = errors.New("email is invalid")
-	ErrPasswordTooShort     = errors.New("password must be at least 8 characters")
-	ErrInvalidResetToken    = errors.New("password reset token is invalid")
-	ErrSessionForbidden     = errors.New("session does not belong to actor")
+	ErrSessionCookieMissing  = errors.New("session cookie is required")
+	ErrInvalidSession        = errors.New("session is invalid")
+	ErrInvalidCredentials    = errors.New("email or password is invalid")
+	ErrInvalidRole           = errors.New("role is invalid")
+	ErrInvalidEmail          = errors.New("email is invalid")
+	ErrPasswordTooShort      = errors.New("password must be at least 8 characters")
+	ErrInvalidResetToken     = errors.New("password reset token is invalid")
+	ErrSessionForbidden      = errors.New("session does not belong to actor")
 	ErrResetRequestThrottled = errors.New("password reset request is throttled")
 )
 
