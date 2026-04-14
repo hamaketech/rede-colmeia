@@ -65,7 +65,11 @@ func main() {
 	router := apphttp.NewRouter(usersHandler, authHandler, authService)
 	handler := middleware.WithRecovery(
 		logger,
-		middleware.WithRequestID(middleware.WithAuditLogger(logger, authService, router)),
+		middleware.WithCORS(
+			cfg.Environment,
+			cfg.CORSAllowList,
+			middleware.WithRequestID(middleware.WithAuditLogger(logger, authService, router)),
+		),
 	)
 
 	server := &http.Server{

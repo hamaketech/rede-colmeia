@@ -61,3 +61,38 @@ func TestAuthenticateMissingSessionCookie(t *testing.T) {
 		t.Fatalf("expected error %v, got %v", ErrSessionCookieMissing, err)
 	}
 }
+
+func TestRegisterAndLoginFlow(t *testing.T) {
+	service := NewService(NewInMemoryRepository())
+
+	actor, err := service.Register(
+		context.Background(),
+		"new-user@redecolmeia.dev",
+		"new-user-pass",
+		RoleContributor,
+	)
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	if actor.Role != RoleContributor {
+		t.Fatalf("expected role %q, got %q", RoleContributor, actor.Role)
+	}
+
+	_, _, err = service.Login(context.Background(), "new-user@redecolmeia.dev", "new-user-pass")
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+}
+
+func TestRegisterDuplicateCredential(t *testing.T) {
+	service := NewService(NewInMemoryRepository())
+	_, err := service.Register(context.Background(), "dup@redecolmeia.dev", "dup-pass-01", RoleContributor)
+	if err != nil {
+		t.Fatalf("expected nil error on first register, got %v", err)
+	}
+
+	_, err = service.Register(context.Background(), "dup@redecolmeia.dev", "dup-pass-02", RoleContributor)
+	if err != ErrCredentialAlreadyExists {
+		t.Fatalf("expected error %v, got %v", ErrCredentialAlreadyExists, err)
+	}
+}

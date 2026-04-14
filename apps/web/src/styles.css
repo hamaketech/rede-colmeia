@@ -340,6 +340,32 @@ select:focus-visible {
   font-weight: 600;
 }
 
+.auth-feedback {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  font-size: 0.875rem;
+}
+
+.auth-feedback-error {
+  background: #fde8e8;
+  color: #8f1d18;
+  border-color: #efb2b2;
+}
+
+.auth-feedback-info {
+  background: #e8f4ff;
+  color: #114a7a;
+  border-color: #a8d0f2;
+}
+
+.auth-helper {
+  margin: 0;
+  font-size: 0.82rem;
+  color: color-mix(in srgb, var(--color-fg) 72%, transparent);
+}
+
 .ui-button {
   min-height: 44px;
   min-width: 44px;

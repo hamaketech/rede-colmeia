@@ -5,6 +5,8 @@ import "os"
 type Config struct {
 	Port          string
 	SentryDSN     string
+	Environment   string
+	CORSAllowList string
 	DatabaseURL   string
 	DatabaseToken string
 	AuthConfig    string
@@ -19,6 +21,8 @@ func Load() Config {
 	return Config{
 		Port:          getEnv("PORT", "8080"),
 		SentryDSN:     os.Getenv("SENTRY_DSN"),
+		Environment:   getEnv("APP_ENV", "dev"),
+		CORSAllowList: os.Getenv("CORS_ALLOW_ORIGINS"),
 		DatabaseURL:   os.Getenv("DATABASE_URL"),
 		DatabaseToken: getEnv("DATABASE_AUTH_TOKEN", os.Getenv("TOKEN")),
 		AuthConfig:    authConfig,

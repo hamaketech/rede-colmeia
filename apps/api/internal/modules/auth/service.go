@@ -5,7 +5,9 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"net/http"
+	"net/mail"
 	"strings"
 	"time"
 
@@ -16,6 +18,9 @@ var (
 	ErrSessionCookieMissing = errors.New("session cookie is required")
 	ErrInvalidSession       = errors.New("session is invalid")
 	ErrInvalidCredentials   = errors.New("email or password is invalid")
+	ErrInvalidRole          = errors.New("role is invalid")
+	ErrInvalidEmail         = errors.New("email is invalid")
+	ErrPasswordTooShort     = errors.New("password must be at least 8 characters")
 )
 
 type Role string
@@ -68,10 +73,16 @@ func (s *Service) SeedCredentials(ctx context.Context, rawCredentials string) er
 		if role == "" || email == "" || password == "" {
 			continue
 		}
+		if !isAllowedRole(role) {
+			continue
+		}
+		if _, err := mail.ParseAddress(email); err != nil {
+			continue
+		}
 
 		hashBytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 		if err != nil {
-			return err
+			return fmt.Errorf("hash credential for %s: %w", email, err)
 		}
 		if err := s.repository.UpsertCredential(
 			ctx,
@@ -81,13 +92,49 @@ func (s *Service) SeedCredentials(ctx context.Context, rawCredentials string) er
 				PasswordHash: string(hashBytes),
 			},
 		); err != nil {
-			return err
+			return fmt.Errorf("upsert credential for %s: %w", email, err)
 		}
 	}
 	return nil
 }
 
+func (s *Service) Register(ctx context.Context, email string, password string, role Role) (Actor, error) {
+	if role == "" {
+		role = RoleContributor
+	}
+	if !isAllowedRole(role) {
+		return Actor{}, ErrInvalidRole
+	}
+	email = strings.ToLower(strings.TrimSpace(email))
+	if _, err := mail.ParseAddress(email); err != nil {
+		return Actor{}, ErrInvalidEmail
+	}
+	if len(strings.TrimSpace(password)) < 8 {
+		return Actor{}, ErrPasswordTooShort
+	}
+
+	hashBytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return Actor{}, fmt.Errorf("hash password: %w", err)
+	}
+	if err := s.repository.CreateCredential(ctx, StoredCredential{
+		Email:        email,
+		Role:         role,
+		PasswordHash: string(hashBytes),
+	}); err != nil {
+		if errors.Is(err, ErrCredentialAlreadyExists) {
+			return Actor{}, err
+		}
+		return Actor{}, fmt.Errorf("store credential: %w", err)
+	}
+	return Actor{
+		Email: email,
+		Role:  role,
+	}, nil
+}
+
 func (s *Service) Login(ctx context.Context, email string, password string) (string, Actor, error) {
+	email = strings.ToLower(strings.TrimSpace(email))
 	credential, err := s.repository.FindCredentialByEmail(ctx, email)
 	if err != nil {
 		return "", Actor{}, ErrInvalidCredentials
@@ -169,4 +216,13 @@ func (s *Service) HasRole(actor Actor, accepted ...Role) bool {
 		}
 	}
 	return false
+}
+
+func isAllowedRole(role Role) bool {
+	switch role {
+	case RoleContributor, RolePartner, RoleAdmin:
+		return true
+	default:
+		return false
+	}
 }

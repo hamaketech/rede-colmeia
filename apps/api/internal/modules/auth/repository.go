@@ -5,13 +5,15 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 )
 
 var (
-	ErrCredentialNotFound = errors.New("credential not found")
-	ErrSessionNotFound    = errors.New("session not found")
+	ErrCredentialNotFound      = errors.New("credential not found")
+	ErrCredentialAlreadyExists = errors.New("credential already exists")
+	ErrSessionNotFound         = errors.New("session not found")
 )
 
 type StoredCredential struct {
@@ -29,6 +31,7 @@ type StoredSession struct {
 
 type Repository interface {
 	UpsertCredential(context.Context, StoredCredential) error
+	CreateCredential(context.Context, StoredCredential) error
 	FindCredentialByEmail(context.Context, string) (StoredCredential, error)
 	InsertSession(context.Context, StoredSession) error
 	FindSessionByID(context.Context, string) (StoredSession, error)
@@ -64,6 +67,16 @@ func (r *InMemoryRepository) FindCredentialByEmail(_ context.Context, email stri
 		return StoredCredential{}, ErrCredentialNotFound
 	}
 	return credential, nil
+}
+
+func (r *InMemoryRepository) CreateCredential(_ context.Context, credential StoredCredential) error {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+	if _, exists := r.credentials[credential.Email]; exists {
+		return ErrCredentialAlreadyExists
+	}
+	r.credentials[credential.Email] = credential
+	return nil
 }
 
 func (r *InMemoryRepository) InsertSession(_ context.Context, session StoredSession) error {
@@ -157,6 +170,24 @@ func (r *SQLRepository) FindCredentialByEmail(ctx context.Context, email string)
 		Role:         Role(role),
 		PasswordHash: passwordHash,
 	}, nil
+}
+
+func (r *SQLRepository) CreateCredential(ctx context.Context, credential StoredCredential) error {
+	_, err := r.db.ExecContext(
+		ctx,
+		`INSERT INTO auth_credentials(email, role, password_hash, created_at, updated_at)
+		 VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+		credential.Email,
+		string(credential.Role),
+		credential.PasswordHash,
+	)
+	if err != nil {
+		if strings.Contains(strings.ToLower(err.Error()), "unique") {
+			return ErrCredentialAlreadyExists
+		}
+		return fmt.Errorf("create credential: %w", err)
+	}
+	return nil
 }
 
 func (r *SQLRepository) InsertSession(ctx context.Context, session StoredSession) error {

@@ -5,6 +5,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	apphttp "github.com/rede-colmeia/apps/api/internal/http"
@@ -147,5 +148,45 @@ func TestLogoutRevokesSession(t *testing.T) {
 
 	if pingRecorder.Code != http.StatusUnauthorized {
 		t.Fatalf("expected status %d, got %d", http.StatusUnauthorized, pingRecorder.Code)
+	}
+}
+
+func TestRegisterAndLoginEndpointFlow(t *testing.T) {
+	handler := newAuthenticatedHandler()
+
+	registerBody := []byte(`{"email":"fresh@redecolmeia.dev","password":"fresh-pass-123","role":"contributor"}`)
+	registerRequest := httptest.NewRequest(http.MethodPost, "/api/v1/auth/register", bytes.NewBuffer(registerBody))
+	registerRecorder := httptest.NewRecorder()
+	handler.ServeHTTP(registerRecorder, registerRequest)
+
+	if registerRecorder.Code != http.StatusCreated {
+		t.Fatalf("expected status %d, got %d", http.StatusCreated, registerRecorder.Code)
+	}
+
+	loginCookie := loginAndGetSessionCookie(t, handler, "fresh@redecolmeia.dev", "fresh-pass-123")
+	whoAmIRequest := httptest.NewRequest(http.MethodGet, "/api/v1/auth/whoami", nil)
+	whoAmIRequest.AddCookie(loginCookie)
+	whoAmIRecorder := httptest.NewRecorder()
+	handler.ServeHTTP(whoAmIRecorder, whoAmIRequest)
+
+	if whoAmIRecorder.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, whoAmIRecorder.Code)
+	}
+}
+
+func TestRegisterRejectsShortPassword(t *testing.T) {
+	handler := newAuthenticatedHandler()
+
+	registerBody := []byte(`{"email":"short@redecolmeia.dev","password":"test+00","role":"contributor"}`)
+	registerRequest := httptest.NewRequest(http.MethodPost, "/api/v1/auth/register", bytes.NewBuffer(registerBody))
+	registerRecorder := httptest.NewRecorder()
+	handler.ServeHTTP(registerRecorder, registerRequest)
+
+	if registerRecorder.Code != http.StatusBadRequest {
+		t.Fatalf("expected status %d, got %d", http.StatusBadRequest, registerRecorder.Code)
+	}
+
+	if !strings.Contains(registerRecorder.Body.String(), "password must be at least 8 characters") {
+		t.Fatalf("expected password length error message, got %q", registerRecorder.Body.String())
 	}
 }
