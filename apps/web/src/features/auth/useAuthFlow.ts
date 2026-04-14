@@ -83,6 +83,7 @@ export function useAuthFlow(t: Translate) {
           ? await login({ email, password })
           : await register({ email, password, role: "contributor" });
       setActor(result.actor);
+      window.dispatchEvent(new Event("auth-changed"));
       const message = mode === "login" ? t("auth.loginSuccess") : t("auth.registerSuccess");
       setFormInfo(message);
       toast.success(message);

@@ -60,10 +60,10 @@ describe("Security settings page", () => {
     renderPage();
 
     await waitFor(() => {
-      expect(screen.getByText("session-current")).toBeInTheDocument();
+      expect(screen.getAllByText(/Codigo de acesso/i).length).toBeGreaterThan(0);
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Revogar sessao" }));
+    fireEvent.click(screen.getByRole("button", { name: "Desconectar este aparelho" }));
     await waitFor(() => {
       expect(revokeSessionByIDMock).toHaveBeenCalledWith({ sessionId: "session-other" });
     });
@@ -73,10 +73,10 @@ describe("Security settings page", () => {
     renderPage();
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Solicitar recuperacao" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Receber instrucoes de nova senha" })).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Solicitar recuperacao" }));
+    fireEvent.click(screen.getByRole("button", { name: "Receber instrucoes de nova senha" }));
     await waitFor(() => {
       expect(requestPasswordResetMock).toHaveBeenCalledWith({ email: "contributor@redecolmeia.dev" });
     });

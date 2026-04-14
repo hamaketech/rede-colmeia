@@ -76,6 +76,7 @@ export function useSecuritySettingsFlow(t: Translate) {
       setFormError(null);
       setFormInfo(t("auth.logoutSuccess"));
       toast.success(t("auth.logoutSuccess"));
+      window.dispatchEvent(new Event("auth-changed"));
       await loadProfileAndSessions();
     } catch (error) {
       const parsedMessage = mapApiError(error);
@@ -93,6 +94,7 @@ export function useSecuritySettingsFlow(t: Translate) {
       setFormError(null);
       setFormInfo(t("auth.logoutAllSuccess"));
       toast.success(t("auth.logoutAllSuccess"));
+      window.dispatchEvent(new Event("auth-changed"));
       await loadProfileAndSessions();
     } catch (error) {
       const parsedMessage = mapApiError(error);
@@ -110,6 +112,7 @@ export function useSecuritySettingsFlow(t: Translate) {
       setFormError(null);
       setFormInfo(t("auth.rotateSuccess"));
       toast.success(t("auth.rotateSuccess"));
+      window.dispatchEvent(new Event("auth-changed"));
       await loadProfileAndSessions();
     } catch (error) {
       const parsedMessage = mapApiError(error);

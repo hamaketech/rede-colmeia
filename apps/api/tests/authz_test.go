@@ -361,6 +361,46 @@ func TestRevokeSessionByIDInvalidatesOnlyTargetSession(t *testing.T) {
 	}
 }
 
+func TestSessionsEndpointHidesRevokedSessions(t *testing.T) {
+	handler := newAuthenticatedHandler()
+	firstCookie := loginAndGetSessionCookie(t, handler, "contributor@redecolmeia.dev", "contributor-pass")
+	secondCookie := loginAndGetSessionCookie(t, handler, "contributor@redecolmeia.dev", "contributor-pass")
+
+	revokeRequest := httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/auth/sessions/revoke",
+		bytes.NewBuffer([]byte(`{"sessionId":"`+secondCookie.Value+`"}`)),
+	)
+	revokeRequest.AddCookie(firstCookie)
+	revokeRecorder := httptest.NewRecorder()
+	handler.ServeHTTP(revokeRecorder, revokeRequest)
+	if revokeRecorder.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, revokeRecorder.Code)
+	}
+
+	sessionsRequest := httptest.NewRequest(http.MethodGet, "/api/v1/auth/sessions", nil)
+	sessionsRequest.AddCookie(firstCookie)
+	sessionsRecorder := httptest.NewRecorder()
+	handler.ServeHTTP(sessionsRecorder, sessionsRequest)
+	if sessionsRecorder.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, sessionsRecorder.Code)
+	}
+
+	var payload struct {
+		Data struct {
+			Sessions []struct {
+				ID string `json:"id"`
+			} `json:"sessions"`
+		} `json:"data"`
+	}
+	if err := json.NewDecoder(sessionsRecorder.Body).Decode(&payload); err != nil {
+		t.Fatalf("expected valid payload, got %v", err)
+	}
+	if len(payload.Data.Sessions) != 1 {
+		t.Fatalf("expected 1 active session, got %d", len(payload.Data.Sessions))
+	}
+}
+
 func TestRegisterRejectsShortPassword(t *testing.T) {
 	handler := newAuthenticatedHandler()
 

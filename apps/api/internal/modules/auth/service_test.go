@@ -208,6 +208,36 @@ func TestRevokeActorSessionRejectsOtherActorSession(t *testing.T) {
 	}
 }
 
+func TestListActorSessionsHidesRevokedAndExpired(t *testing.T) {
+	service := NewService(NewInMemoryRepository())
+	if err := service.SeedCredentials(context.Background(), "admin:admin@redecolmeia.dev:admin-pass"); err != nil {
+		t.Fatalf("expected nil error while seeding credentials, got %v", err)
+	}
+
+	currentSessionID, actor, err := service.Login(context.Background(), "admin@redecolmeia.dev", "admin-pass")
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	staleSessionID, _, err := service.Login(context.Background(), "admin@redecolmeia.dev", "admin-pass")
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	if err := service.RevokeActorSession(context.Background(), actor, staleSessionID); err != nil {
+		t.Fatalf("expected nil error revoking session, got %v", err)
+	}
+
+	sessions, err := service.ListActorSessions(context.Background(), actor, currentSessionID)
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	if len(sessions) != 1 {
+		t.Fatalf("expected 1 visible session, got %d", len(sessions))
+	}
+	if sessions[0].ID != currentSessionID {
+		t.Fatalf("expected current session %q, got %q", currentSessionID, sessions[0].ID)
+	}
+}
+
 func TestRequestPasswordResetIsThrottled(t *testing.T) {
 	service := NewService(NewInMemoryRepository())
 	if err := service.SeedCredentials(context.Background(), "admin:admin@redecolmeia.dev:admin-pass"); err != nil {

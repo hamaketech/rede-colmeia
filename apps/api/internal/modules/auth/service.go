@@ -267,6 +267,9 @@ func (s *Service) ListActorSessions(ctx context.Context, actor Actor, currentSes
 	for _, session := range storedSessions {
 		isCurrent := currentSessionID != "" && session.ID == currentSessionID
 		isActive := session.RevokedAt == nil && now.Before(session.ExpiresAt)
+		if !isActive && !isCurrent {
+			continue
+		}
 		views = append(views, SessionView{
 			ID:        session.ID,
 			Role:      session.Actor.Role,
