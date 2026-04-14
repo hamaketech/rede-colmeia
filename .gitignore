@@ -1,6 +1,9 @@
 .DS_Store
 *.log
 
+# Internal docs (not versioned)
+docs/
+
 # Environment files
 .env
 .env.*
