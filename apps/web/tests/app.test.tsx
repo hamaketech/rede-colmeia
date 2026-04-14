@@ -17,5 +17,6 @@ describe("AppLayout", () => {
     );
 
     expect(screen.getByText("Rede Colmeia")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Painel" })).toBeInTheDocument();
   });
 });

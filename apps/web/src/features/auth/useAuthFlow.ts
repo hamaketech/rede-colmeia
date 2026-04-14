@@ -94,10 +94,12 @@ export function useAuthFlow(t: Translate) {
       const message = mode === "login" ? t("auth.loginSuccess") : t("auth.registerSuccess");
       setFormInfo(message);
       toast.success(message);
+      return true;
     } catch (error) {
       const parsedMessage = mapApiError(error);
       setFormError(parsedMessage);
       toast.error(parsedMessage);
+      return false;
     } finally {
       setLoading(false);
     }

@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { AuthPage } from "../src/features/auth/AuthPage";
 import { LanguageProvider } from "../src/lib/i18n/LanguageProvider";
 import { vi } from "vitest";
+import { MemoryRouter } from "react-router-dom";
 
 const loginMock = vi.fn();
 const registerMock = vi.fn();
@@ -11,6 +12,17 @@ const rotateSessionMock = vi.fn();
 const whoAmIMock = vi.fn();
 const requestPasswordResetMock = vi.fn();
 const confirmPasswordResetMock = vi.fn();
+const navigateMock = vi.fn();
+let locationState: unknown = null;
+
+vi.mock("react-router-dom", async () => {
+  const actual = await vi.importActual<typeof import("react-router-dom")>("react-router-dom");
+  return {
+    ...actual,
+    useNavigate: () => navigateMock,
+    useLocation: () => ({ pathname: "/auth", search: "", hash: "", key: "test", state: locationState })
+  };
+});
 
 vi.mock("../src/lib/api/auth", () => ({
   login: (...args: unknown[]) => loginMock(...args),
@@ -26,7 +38,9 @@ vi.mock("../src/lib/api/auth", () => ({
 function renderPage() {
   return render(
     <LanguageProvider>
-      <AuthPage />
+      <MemoryRouter>
+        <AuthPage />
+      </MemoryRouter>
     </LanguageProvider>
   );
 }
@@ -34,6 +48,7 @@ function renderPage() {
 describe("Auth page", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    locationState = null;
   });
 
   it("submits login credentials", async () => {
@@ -56,6 +71,7 @@ describe("Auth page", () => {
         email: "admin@redecolmeia.dev",
         password: "admin-pass"
       });
+      expect(navigateMock).toHaveBeenCalledWith("/dashboard");
     });
   });
 
@@ -120,7 +136,7 @@ describe("Auth page", () => {
       expect(requestPasswordResetMock).toHaveBeenCalledWith({ email: "new@redecolmeia.dev" });
     });
 
-    fireEvent.click(screen.getByText("Ferramentas de desenvolvimento"));
+    fireEvent.click(screen.getByText("Ferramentas de reset"));
     fireEvent.change(screen.getByLabelText("Token de recuperacao"), {
       target: { value: "dev-token-123" }
     });
@@ -135,5 +151,13 @@ describe("Auth page", () => {
         newPassword: "new-pass-123"
       });
     });
+  });
+
+  it("shows required-session notice when redirected from protected route", () => {
+    locationState = { authReason: "required" };
+    renderPage();
+    expect(
+      screen.getByText("Sua sessao e necessaria para acessar o painel. Entre para continuar.")
+    ).toBeInTheDocument();
   });
 });
