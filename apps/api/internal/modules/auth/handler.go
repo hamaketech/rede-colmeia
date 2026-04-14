@@ -32,7 +32,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sessionID, actor, err := h.service.Login(payload.Email, payload.Password)
+	sessionID, actor, err := h.service.Login(r.Context(), payload.Email, payload.Password)
 	if err != nil {
 		http.Error(w, "invalid credentials", http.StatusUnauthorized)
 		return
@@ -61,7 +61,7 @@ func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 
 	cookie, err := r.Cookie(SessionCookieName)
 	if err == nil {
-		h.service.Logout(cookie.Value)
+		h.service.Logout(r.Context(), cookie.Value)
 	}
 
 	http.SetCookie(w, &http.Cookie{

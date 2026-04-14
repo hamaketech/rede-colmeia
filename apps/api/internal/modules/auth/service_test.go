@@ -1,15 +1,22 @@
 package auth
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 )
 
 func TestLoginAndAuthenticateSuccess(t *testing.T) {
-	service := NewService("admin:admin@redecolmeia.dev:admin-pass,contributor:alice@redecolmeia.dev:alice-pass")
+	service := NewService(NewInMemoryRepository())
+	if err := service.SeedCredentials(
+		context.Background(),
+		"admin:admin@redecolmeia.dev:admin-pass,contributor:alice@redecolmeia.dev:alice-pass",
+	); err != nil {
+		t.Fatalf("expected nil error while seeding credentials, got %v", err)
+	}
 
-	sessionID, _, err := service.Login("admin@redecolmeia.dev", "admin-pass")
+	sessionID, _, err := service.Login(context.Background(), "admin@redecolmeia.dev", "admin-pass")
 	if err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}
@@ -34,16 +41,19 @@ func TestLoginAndAuthenticateSuccess(t *testing.T) {
 }
 
 func TestLoginInvalidCredentials(t *testing.T) {
-	service := NewService("admin:admin@redecolmeia.dev:admin-pass")
+	service := NewService(NewInMemoryRepository())
+	if err := service.SeedCredentials(context.Background(), "admin:admin@redecolmeia.dev:admin-pass"); err != nil {
+		t.Fatalf("expected nil error while seeding credentials, got %v", err)
+	}
 
-	_, _, err := service.Login("admin@redecolmeia.dev", "wrong-pass")
+	_, _, err := service.Login(context.Background(), "admin@redecolmeia.dev", "wrong-pass")
 	if err != ErrInvalidCredentials {
 		t.Fatalf("expected error %v, got %v", ErrInvalidCredentials, err)
 	}
 }
 
 func TestAuthenticateMissingSessionCookie(t *testing.T) {
-	service := NewService("admin:admin@redecolmeia.dev:admin-pass")
+	service := NewService(NewInMemoryRepository())
 	request := httptest.NewRequest(http.MethodGet, "/api/v1/auth/whoami", nil)
 
 	_, err := service.Authenticate(request)

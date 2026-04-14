@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -11,7 +12,10 @@ import (
 )
 
 func TestHealthEndpoint(t *testing.T) {
-	authService := auth.NewService("contributor:test@redecolmeia.dev:test-pass")
+	authService := auth.NewService(auth.NewInMemoryRepository())
+	if err := authService.SeedCredentials(context.Background(), "contributor:test@redecolmeia.dev:test-pass"); err != nil {
+		t.Fatalf("expected nil error while seeding credentials, got %v", err)
+	}
 	authHandler := auth.NewHandler(authService)
 	handler := apphttp.NewRouter(
 		users.NewHandler(users.NewService(users.NewInMemoryRepository())),

@@ -2,6 +2,7 @@ package tests
 
 import (
 	"bytes"
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -12,9 +13,13 @@ import (
 )
 
 func newAuthenticatedHandler() http.Handler {
-	authService := auth.NewService(
+	authService := auth.NewService(auth.NewInMemoryRepository())
+	if err := authService.SeedCredentials(
+		context.Background(),
 		"contributor:contributor@redecolmeia.dev:contributor-pass,partner:partner@redecolmeia.dev:partner-pass",
-	)
+	); err != nil {
+		panic(err)
+	}
 	authHandler := auth.NewHandler(authService)
 	return apphttp.NewRouter(
 		users.NewHandler(users.NewService(users.NewInMemoryRepository())),

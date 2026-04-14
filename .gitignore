@@ -1,12 +1,14 @@
 .DS_Store
 *.log
 
-# Internal docs (not versioned)
+# Documentation is intentionally local-only
 docs/
 
 # Environment files
 .env
 .env.*
+docs/credentials.md
+scripts/credentials*.env
 
 # Node
 node_modules/

@@ -7,8 +7,9 @@ import (
 	"errors"
 	"net/http"
 	"strings"
-	"sync"
 	"time"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
 var (
@@ -32,29 +33,26 @@ type Actor struct {
 
 const SessionCookieName = "rede_colmeia_session"
 
-type credential struct {
-	email    string
-	password string
-	role     Role
-}
-
-type session struct {
-	actor     Actor
-	expiresAt time.Time
-}
-
 type actorContextKey struct{}
 
 type Service struct {
-	credentials map[string]credential
-	sessions    map[string]session
-	sessionTTL  time.Duration
-	mutex       sync.RWMutex
-	now         func() time.Time
+	repository Repository
+	sessionTTL time.Duration
+	now        func() time.Time
 }
 
-func NewService(rawCredentials string) *Service {
-	credentials := map[string]credential{}
+func NewService(repository Repository) *Service {
+	if repository == nil {
+		repository = NewInMemoryRepository()
+	}
+	return &Service{
+		repository: repository,
+		sessionTTL: 24 * time.Hour,
+		now:        time.Now,
+	}
+}
+
+func (s *Service) SeedCredentials(ctx context.Context, rawCredentials string) error {
 	for _, pair := range strings.Split(rawCredentials, ",") {
 		trimmed := strings.TrimSpace(pair)
 		if trimmed == "" {
@@ -70,39 +68,47 @@ func NewService(rawCredentials string) *Service {
 		if role == "" || email == "" || password == "" {
 			continue
 		}
-		credentials[email] = credential{
-			email:    email,
-			password: password,
-			role:     role,
+
+		hashBytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+		if err != nil {
+			return err
+		}
+		if err := s.repository.UpsertCredential(
+			ctx,
+			StoredCredential{
+				Email:        email,
+				Role:         role,
+				PasswordHash: string(hashBytes),
+			},
+		); err != nil {
+			return err
 		}
 	}
-
-	return &Service{
-		credentials: credentials,
-		sessions:    map[string]session{},
-		sessionTTL:  24 * time.Hour,
-		now:         time.Now,
-	}
+	return nil
 }
 
-func (s *Service) Login(email string, password string) (string, Actor, error) {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
-	record, ok := s.credentials[email]
-	if !ok || record.password != password {
+func (s *Service) Login(ctx context.Context, email string, password string) (string, Actor, error) {
+	credential, err := s.repository.FindCredentialByEmail(ctx, email)
+	if err != nil {
+		return "", Actor{}, ErrInvalidCredentials
+	}
+	if bcrypt.CompareHashAndPassword([]byte(credential.PasswordHash), []byte(password)) != nil {
 		return "", Actor{}, ErrInvalidCredentials
 	}
 
 	sessionID := randomSessionID()
 	actor := Actor{
-		Email: record.email,
-		Role:  record.role,
+		Email: credential.Email,
+		Role:  credential.Role,
 	}
-	s.sessions[sessionID] = session{
-		actor:     actor,
-		expiresAt: s.now().Add(s.sessionTTL),
+	if err := s.repository.InsertSession(ctx, StoredSession{
+		ID:        sessionID,
+		Actor:     actor,
+		ExpiresAt: s.now().Add(s.sessionTTL),
+	}); err != nil {
+		return "", Actor{}, err
 	}
+
 	return sessionID, actor, nil
 }
 
@@ -112,30 +118,27 @@ func (s *Service) Authenticate(request *http.Request) (Actor, error) {
 		return Actor{}, ErrSessionCookieMissing
 	}
 
-	s.mutex.RLock()
-	stored, ok := s.sessions[cookie.Value]
-	s.mutex.RUnlock()
-	if !ok {
+	stored, err := s.repository.FindSessionByID(request.Context(), cookie.Value)
+	if err != nil {
 		return Actor{}, ErrInvalidSession
 	}
 
-	if s.now().After(stored.expiresAt) {
-		s.mutex.Lock()
-		delete(s.sessions, cookie.Value)
-		s.mutex.Unlock()
+	if stored.RevokedAt != nil {
+		return Actor{}, ErrInvalidSession
+	}
+	if s.now().After(stored.ExpiresAt) {
+		_ = s.repository.RevokeSession(request.Context(), cookie.Value)
 		return Actor{}, ErrInvalidSession
 	}
 
-	return stored.actor, nil
+	return stored.Actor, nil
 }
 
-func (s *Service) Logout(sessionID string) {
+func (s *Service) Logout(ctx context.Context, sessionID string) {
 	if sessionID == "" {
 		return
 	}
-	s.mutex.Lock()
-	delete(s.sessions, sessionID)
-	s.mutex.Unlock()
+	_ = s.repository.RevokeSession(ctx, sessionID)
 }
 
 func (s *Service) SessionTTL() time.Duration {

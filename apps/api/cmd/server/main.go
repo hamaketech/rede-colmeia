@@ -24,11 +24,7 @@ func main() {
 	logger := observability.NewLogger()
 	observability.InitSentry(cfg.SentryDSN)
 
-	if err := database.RunMigrations("migrations"); err != nil {
-		logger.Printf("migration warning: %v", err)
-	}
-
-	db, err := database.Open(cfg.DatabaseURL)
+	db, err := database.Open(cfg.DatabaseURL, cfg.DatabaseToken)
 	if err != nil {
 		logger.Fatalf("database setup failed: %v", err)
 	}
@@ -36,16 +32,32 @@ func main() {
 		defer db.Close()
 	}
 
+	if err := database.RunMigrations(db, "migrations"); err != nil {
+		logger.Fatalf("migration setup failed: %v", err)
+	}
+
 	var usersRepo users.Repository
 	if db != nil {
 		usersRepo = users.NewSQLRepository(db)
-		logger.Printf("users repository adapter: sqlite")
+		logger.Printf("users repository adapter: database")
 	} else {
 		usersRepo = users.NewInMemoryRepository()
 		logger.Printf("users repository adapter: in-memory fallback")
 	}
 
-	authService := auth.NewService(cfg.AuthConfig)
+	var authRepo auth.Repository
+	if db != nil {
+		authRepo = auth.NewSQLRepository(db)
+		logger.Printf("auth repository adapter: database")
+	} else {
+		authRepo = auth.NewInMemoryRepository()
+		logger.Printf("auth repository adapter: in-memory fallback")
+	}
+
+	authService := auth.NewService(authRepo)
+	if err := authService.SeedCredentials(context.Background(), cfg.AuthConfig); err != nil {
+		logger.Fatalf("seed auth credentials failed: %v", err)
+	}
 	authHandler := auth.NewHandler(authService)
 	usersService := users.NewService(usersRepo)
 	usersHandler := users.NewHandler(usersService)
