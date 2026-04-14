@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"net/mail"
 	"strings"
-	"sync"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
@@ -62,9 +61,7 @@ type Service struct {
 
 	resetDelivery      PasswordResetDelivery
 	sensitiveEventHook SensitiveEventHook
-	resetThrottleMu    sync.Mutex
 	resetRequestWindow time.Duration
-	resetRequestByMail map[string]time.Time
 }
 
 func NewService(repository Repository) *Service {
@@ -79,7 +76,6 @@ func NewService(repository Repository) *Service {
 		resetDelivery:      NoopPasswordResetDelivery{},
 		sensitiveEventHook: NoopSensitiveEventHook{},
 		resetRequestWindow: 1 * time.Minute,
-		resetRequestByMail: make(map[string]time.Time),
 	}
 }
 
@@ -330,7 +326,7 @@ func (s *Service) RotateSession(ctx context.Context, currentSessionID string, ac
 
 func (s *Service) RequestPasswordReset(ctx context.Context, email string) (string, error) {
 	normalized := strings.ToLower(strings.TrimSpace(email))
-	if s.isResetRequestThrottled(normalized) {
+	if s.isResetRequestThrottled(ctx, normalized) {
 		return "", ErrResetRequestThrottled
 	}
 
@@ -450,20 +446,22 @@ func isAllowedRole(role Role) bool {
 	}
 }
 
-func (s *Service) isResetRequestThrottled(email string) bool {
+func (s *Service) isResetRequestThrottled(ctx context.Context, email string) bool {
 	if email == "" {
 		return false
 	}
 
-	s.resetThrottleMu.Lock()
-	defer s.resetThrottleMu.Unlock()
-
 	now := s.now()
-	lastRequestAt, exists := s.resetRequestByMail[email]
+	lastRequestAt, exists, err := s.repository.ReadResetThrottle(ctx, email)
+	if err != nil {
+		return false
+	}
 	if exists && now.Before(lastRequestAt.Add(s.resetRequestWindow)) {
 		return true
 	}
-	s.resetRequestByMail[email] = now
+	if err := s.repository.UpsertResetThrottle(ctx, email, now); err != nil {
+		return false
+	}
 	return false
 }
 

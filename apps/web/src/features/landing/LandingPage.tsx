@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useOpsMetrics } from "@/hooks/useOpsMetrics";
 import { useLanguage } from "@/lib/i18n/LanguageProvider";
 import { useLandingVariant } from "@/lib/landing/useLandingVariant";
 import { Link } from "react-router-dom";
@@ -8,10 +9,12 @@ import { Link } from "react-router-dom";
 export function LandingPage() {
   const { t } = useLanguage();
   const { variant, abTestEnabled } = useLandingVariant();
+  const { transparencySummary } = useOpsMetrics();
+  const formatCount = (value: number | undefined) => (typeof value === "number" ? value.toLocaleString() : "--");
   const impactStats = [
-    { label: t("landing.statContributors"), value: "1,240+" },
-    { label: t("landing.statPartners"), value: "38" },
-    { label: t("landing.statFamilies"), value: "5,800+" }
+    { label: t("landing.statContributors"), value: formatCount(transparencySummary?.contributors) },
+    { label: t("landing.statPartners"), value: formatCount(transparencySummary?.partners) },
+    { label: t("landing.statFamilies"), value: formatCount(transparencySummary?.familiesSupported) }
   ];
 
   const flowSteps = [

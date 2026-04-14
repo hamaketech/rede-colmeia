@@ -54,6 +54,7 @@ type webhookResetDelivery struct {
 	token    string
 	client   *http.Client
 	logger   deliveryLogger
+	retries  int
 }
 
 func NewWebhookResetDelivery(endpoint string, token string, logger deliveryLogger) PasswordResetDelivery {
@@ -65,6 +66,7 @@ func NewWebhookResetDelivery(endpoint string, token string, logger deliveryLogge
 		token:    token,
 		client:   &http.Client{Timeout: 5 * time.Second},
 		logger:   logger,
+		retries:  3,
 	}
 }
 
@@ -77,31 +79,48 @@ func (d *webhookResetDelivery) SendPasswordReset(ctx context.Context, email stri
 		return fmt.Errorf("marshal reset payload: %w", err)
 	}
 
-	request, err := http.NewRequestWithContext(
-		ctx,
-		http.MethodPost,
-		d.endpoint,
-		bytes.NewBuffer(body),
-	)
-	if err != nil {
-		return fmt.Errorf("build reset delivery request: %w", err)
-	}
-	request.Header.Set("Content-Type", "application/json")
-	if d.token != "" {
-		request.Header.Set("Authorization", "Bearer "+d.token)
-	}
+	var lastErr error
+	for attempt := 1; attempt <= d.retries; attempt++ {
+		request, requestErr := http.NewRequestWithContext(
+			ctx,
+			http.MethodPost,
+			d.endpoint,
+			bytes.NewBuffer(body),
+		)
+		if requestErr != nil {
+			return fmt.Errorf("build reset delivery request: %w", requestErr)
+		}
+		request.Header.Set("Content-Type", "application/json")
+		if d.token != "" {
+			request.Header.Set("Authorization", "Bearer "+d.token)
+		}
 
-	response, err := d.client.Do(request)
-	if err != nil {
-		return fmt.Errorf("send reset delivery request: %w", err)
-	}
-	defer response.Body.Close()
+		response, sendErr := d.client.Do(request)
+		if sendErr != nil {
+			lastErr = fmt.Errorf("send reset delivery request: %w", sendErr)
+			if attempt < d.retries {
+				time.Sleep(250 * time.Millisecond)
+				continue
+			}
+			break
+		}
 
-	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return fmt.Errorf("delivery provider status: %d", response.StatusCode)
+		if response.StatusCode >= 200 && response.StatusCode < 300 {
+			response.Body.Close()
+			if d.logger != nil {
+				d.logger.Printf("password reset dispatched to provider for %s (attempt %d)", email, attempt)
+			}
+			return nil
+		}
+
+		lastErr = fmt.Errorf("delivery provider status: %d", response.StatusCode)
+		response.Body.Close()
+		if response.StatusCode >= 400 && response.StatusCode < 500 {
+			break
+		}
+		if attempt < d.retries {
+			time.Sleep(250 * time.Millisecond)
+		}
 	}
-	if d.logger != nil {
-		d.logger.Printf("password reset dispatched to provider for %s", email)
-	}
-	return nil
+	return lastErr
 }

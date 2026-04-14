@@ -15,6 +15,7 @@ import (
 	apphttp "github.com/rede-colmeia/apps/api/internal/http"
 	"github.com/rede-colmeia/apps/api/internal/middleware"
 	"github.com/rede-colmeia/apps/api/internal/modules/auth"
+	"github.com/rede-colmeia/apps/api/internal/modules/ops"
 	"github.com/rede-colmeia/apps/api/internal/modules/users"
 	"github.com/rede-colmeia/apps/api/internal/observability"
 )
@@ -71,10 +72,25 @@ func main() {
 		logger.Fatalf("seed auth credentials failed: %v", err)
 	}
 	authHandler := auth.NewHandler(authService, cfg.Environment == "dev")
+
+	var opsRepo ops.Repository
+	if db != nil {
+		opsRepo = ops.NewSQLRepository(db)
+		logger.Printf("ops repository adapter: database")
+	} else {
+		opsRepo = ops.NewInMemoryRepository()
+		logger.Printf("ops repository adapter: in-memory fallback")
+	}
+	opsService := ops.NewService(opsRepo)
+	if err := opsService.EnsureSeedData(context.Background()); err != nil {
+		logger.Fatalf("seed ops data failed: %v", err)
+	}
+	opsHandler := ops.NewHandler(opsService)
+
 	usersService := users.NewService(usersRepo)
 	usersHandler := users.NewHandler(usersService)
 
-	router := apphttp.NewRouter(usersHandler, authHandler, authService)
+	router := apphttp.NewRouter(usersHandler, authHandler, opsHandler, authService)
 	handler := middleware.WithRecovery(
 		logger,
 		middleware.WithCORS(

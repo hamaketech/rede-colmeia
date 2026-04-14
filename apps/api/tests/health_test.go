@@ -8,6 +8,7 @@ import (
 
 	apphttp "github.com/rede-colmeia/apps/api/internal/http"
 	"github.com/rede-colmeia/apps/api/internal/modules/auth"
+	"github.com/rede-colmeia/apps/api/internal/modules/ops"
 	"github.com/rede-colmeia/apps/api/internal/modules/users"
 )
 
@@ -17,9 +18,11 @@ func TestHealthEndpoint(t *testing.T) {
 		t.Fatalf("expected nil error while seeding credentials, got %v", err)
 	}
 	authHandler := auth.NewHandler(authService, true)
+	opsHandler := ops.NewHandler(ops.NewService(ops.NewInMemoryRepository()))
 	handler := apphttp.NewRouter(
 		users.NewHandler(users.NewService(users.NewInMemoryRepository())),
 		authHandler,
+		opsHandler,
 		authService,
 	)
 	request := httptest.NewRequest(http.MethodGet, "/health", nil)

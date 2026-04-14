@@ -6,9 +6,15 @@ import (
 
 	"github.com/rede-colmeia/apps/api/internal/middleware"
 	"github.com/rede-colmeia/apps/api/internal/modules/auth"
+	"github.com/rede-colmeia/apps/api/internal/modules/ops"
 )
 
-func NewRouter(usersHandler http.Handler, authHandler *auth.Handler, authService *auth.Service) http.Handler {
+func NewRouter(
+	usersHandler http.Handler,
+	authHandler *auth.Handler,
+	opsHandler *ops.Handler,
+	authService *auth.Service,
+) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]string{
@@ -34,6 +40,12 @@ func NewRouter(usersHandler http.Handler, authHandler *auth.Handler, authService
 	mux.Handle("/api/v1/auth/sessions", requireAnyAuthenticated(http.HandlerFunc(authHandler.Sessions)))
 	mux.Handle("/api/v1/auth/sessions/revoke", requireAnyAuthenticated(http.HandlerFunc(authHandler.RevokeSessionByID)))
 	mux.Handle("/api/v1/auth/whoami", requireAnyAuthenticated(http.HandlerFunc(authHandler.WhoAmI)))
+	mux.HandleFunc("/api/v1/ops/transparency/summary", opsHandler.TransparencySummary)
+	mux.HandleFunc("/api/v1/ops/indicators", opsHandler.Indicators)
+	mux.Handle(
+		"/api/v1/ops/subscriptions/summary",
+		requireAnyAuthenticated(http.HandlerFunc(opsHandler.SubscriptionsSummary)),
+	)
 	mux.Handle("/api/v1/users/ping", requireOperator(usersHandler))
 	return mux
 }

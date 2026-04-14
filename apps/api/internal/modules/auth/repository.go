@@ -58,6 +58,8 @@ type Repository interface {
 	CreatePasswordResetToken(context.Context, StoredPasswordResetToken) error
 	FindPasswordResetToken(context.Context, string) (StoredPasswordResetToken, error)
 	ConsumePasswordResetToken(context.Context, string, time.Time) error
+	ReadResetThrottle(context.Context, string) (time.Time, bool, error)
+	UpsertResetThrottle(context.Context, string, time.Time) error
 	InsertAuthEvent(context.Context, AuthEvent) error
 }
 
@@ -65,6 +67,7 @@ type InMemoryRepository struct {
 	credentials map[string]StoredCredential
 	sessions    map[string]StoredSession
 	resetTokens map[string]StoredPasswordResetToken
+	throttles  map[string]time.Time
 	events      []AuthEvent
 	mutex       sync.RWMutex
 }
@@ -74,6 +77,7 @@ func NewInMemoryRepository() *InMemoryRepository {
 		credentials: map[string]StoredCredential{},
 		sessions:    map[string]StoredSession{},
 		resetTokens: map[string]StoredPasswordResetToken{},
+		throttles:   map[string]time.Time{},
 		events:      []AuthEvent{},
 	}
 }
@@ -216,6 +220,20 @@ func (r *InMemoryRepository) ConsumePasswordResetToken(_ context.Context, tokenH
 	marked := usedAt.UTC()
 	token.UsedAt = &marked
 	r.resetTokens[tokenHash] = token
+	return nil
+}
+
+func (r *InMemoryRepository) ReadResetThrottle(_ context.Context, email string) (time.Time, bool, error) {
+	r.mutex.RLock()
+	defer r.mutex.RUnlock()
+	lastRequestAt, ok := r.throttles[email]
+	return lastRequestAt, ok, nil
+}
+
+func (r *InMemoryRepository) UpsertResetThrottle(_ context.Context, email string, requestedAt time.Time) error {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+	r.throttles[email] = requestedAt.UTC()
 	return nil
 }
 
@@ -545,6 +563,43 @@ func (r *SQLRepository) ConsumePasswordResetToken(ctx context.Context, tokenHash
 	}
 	if affectedRows == 0 {
 		return ErrPasswordResetNotFound
+	}
+	return nil
+}
+
+func (r *SQLRepository) ReadResetThrottle(ctx context.Context, email string) (time.Time, bool, error) {
+	var requestedAtRaw any
+	err := r.db.QueryRowContext(
+		ctx,
+		`SELECT last_requested_at FROM auth_reset_throttles WHERE email = ?`,
+		email,
+	).Scan(&requestedAtRaw)
+	if errors.Is(err, sql.ErrNoRows) {
+		return time.Time{}, false, nil
+	}
+	if err != nil {
+		return time.Time{}, false, fmt.Errorf("read reset throttle: %w", err)
+	}
+	requestedAt, err := parseTimeValue(requestedAtRaw)
+	if err != nil {
+		return time.Time{}, false, fmt.Errorf("parse reset throttle timestamp: %w", err)
+	}
+	return requestedAt.UTC(), true, nil
+}
+
+func (r *SQLRepository) UpsertResetThrottle(ctx context.Context, email string, requestedAt time.Time) error {
+	_, err := r.db.ExecContext(
+		ctx,
+		`INSERT INTO auth_reset_throttles(email, last_requested_at, updated_at)
+		 VALUES (?, ?, CURRENT_TIMESTAMP)
+		 ON CONFLICT(email) DO UPDATE SET
+		   last_requested_at = excluded.last_requested_at,
+		   updated_at = CURRENT_TIMESTAMP`,
+		email,
+		requestedAt.UTC().Format(time.RFC3339),
+	)
+	if err != nil {
+		return fmt.Errorf("upsert reset throttle: %w", err)
 	}
 	return nil
 }

@@ -1,4 +1,5 @@
 import { useHealth } from "../../hooks/useHealth";
+import { useOpsMetrics } from "@/hooks/useOpsMetrics";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,19 +10,21 @@ import { toast } from "sonner";
 export function DashboardPage() {
   const { t } = useLanguage();
   const { status, error } = useHealth();
+  const { state: metricsState, error: metricsError, transparencySummary, indicators, contributionSummary } = useOpsMetrics();
   const statusVariant = status === "ok" ? "success" : "error";
+  const formatCount = (value: number | undefined) => (typeof value === "number" ? value.toLocaleString() : "--");
   const impactCards = [
     {
       label: t("dashboard.impactContributorsLabel"),
-      value: t("dashboard.impactContributorsValue")
+      value: formatCount(transparencySummary?.contributors)
     },
     {
       label: t("dashboard.impactPartnersLabel"),
-      value: t("dashboard.impactPartnersValue")
+      value: formatCount(transparencySummary?.partners)
     },
     {
       label: t("dashboard.impactFamiliesLabel"),
-      value: t("dashboard.impactFamiliesValue")
+      value: formatCount(transparencySummary?.familiesSupported)
     }
   ];
   const flowCards = [
@@ -41,26 +44,27 @@ export function DashboardPage() {
   const insightCards = [
     {
       label: t("dashboard.insightCoverage"),
-      value: t("dashboard.insightCoverageValue"),
-      progress: 86
+      value: indicators ? `${indicators.deliveryCoverageRate}%` : "--",
+      progress: indicators?.deliveryCoverageRate ?? 0
     },
     {
       label: t("dashboard.insightActivation"),
-      value: t("dashboard.insightActivationValue"),
-      progress: 72
+      value: indicators ? `${indicators.contributorActivationRate}%` : "--",
+      progress: indicators?.contributorActivationRate ?? 0
     },
     {
       label: t("dashboard.insightResponse"),
-      value: t("dashboard.insightResponseValue"),
-      progress: 64
+      value: indicators ? `${indicators.averageResponseHours}h` : "--",
+      progress: indicators ? Math.max(10, 100 - indicators.averageResponseHours * 2) : 0
     }
   ];
   const pipeline = [
-    { label: t("dashboard.pipelineQueued"), value: 21 },
-    { label: t("dashboard.pipelinePreparing"), value: 14 },
-    { label: t("dashboard.pipelineDelivery"), value: 9 },
-    { label: t("dashboard.pipelineDone"), value: 37 }
+    { label: t("dashboard.pipelineQueued"), value: indicators?.pipeline.queued ?? 0 },
+    { label: t("dashboard.pipelinePreparing"), value: indicators?.pipeline.preparing ?? 0 },
+    { label: t("dashboard.pipelineDelivery"), value: indicators?.pipeline.inDelivery ?? 0 },
+    { label: t("dashboard.pipelineDone"), value: indicators?.pipeline.delivered ?? 0 }
   ];
+  const metricsLastUpdated = transparencySummary?.lastUpdated ?? indicators?.lastUpdated;
 
   return (
     <section className="page dashboard-page">
@@ -82,6 +86,8 @@ export function DashboardPage() {
         </CardHeader>
         <CardContent>
           <p className="dashboard-muted">{t("dashboard.welcomeBody")}</p>
+          {metricsState === "loading" ? <p className="dashboard-muted">{t("dashboard.liveDataLoading")}</p> : null}
+          {metricsState === "error" ? <p className="dashboard-muted">{t("dashboard.liveDataUnavailable")}</p> : null}
         </CardContent>
       </Card>
 
@@ -109,6 +115,9 @@ export function DashboardPage() {
         </CardHeader>
         <CardContent className="stack">
           <p className="dashboard-muted">{t("dashboard.sectionInsightsHint")}</p>
+          <p className="dashboard-muted">
+            {t("dashboard.impactContributorsLabel")}: {formatCount(contributionSummary?.activeSubscriptions)}
+          </p>
           <section className="dashboard-grid">
             {insightCards.map((insight) => (
               <article key={insight.label} className="dashboard-insight-card">
@@ -150,6 +159,13 @@ export function DashboardPage() {
               </article>
             ))}
           </section>
+          {metricsLastUpdated ? (
+            <p className="dashboard-muted">
+              {t("dashboard.lastUpdated")}: {new Date(metricsLastUpdated).toLocaleString()}
+            </p>
+          ) : (
+            <p className="dashboard-muted">{t("dashboard.liveDataFallback")}</p>
+          )}
           <div className="meta-row dashboard-status-row">
             <strong>{t("dashboard.apiStatus")}</strong>
             <Badge variant={statusVariant}>{status}</Badge>
@@ -198,6 +214,15 @@ export function DashboardPage() {
           <CardContent>
             <p className="error-text">
               {t("dashboard.errorPrefix")}: {error}
+            </p>
+          </CardContent>
+        </Card>
+      ) : null}
+      {metricsError ? (
+        <Card className="dashboard-panel-card">
+          <CardContent>
+            <p className="error-text">
+              {t("dashboard.liveDataUnavailable")}: {metricsError}
             </p>
           </CardContent>
         </Card>

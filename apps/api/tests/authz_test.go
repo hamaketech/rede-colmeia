@@ -11,6 +11,7 @@ import (
 
 	apphttp "github.com/rede-colmeia/apps/api/internal/http"
 	"github.com/rede-colmeia/apps/api/internal/modules/auth"
+	"github.com/rede-colmeia/apps/api/internal/modules/ops"
 	"github.com/rede-colmeia/apps/api/internal/modules/users"
 )
 
@@ -27,9 +28,11 @@ func newAuthenticatedHandlerWithResetExposure(exposeResetToken bool) http.Handle
 		panic(err)
 	}
 	authHandler := auth.NewHandler(authService, exposeResetToken)
+	opsHandler := ops.NewHandler(ops.NewService(ops.NewInMemoryRepository()))
 	return apphttp.NewRouter(
 		users.NewHandler(users.NewService(users.NewInMemoryRepository())),
 		authHandler,
+		opsHandler,
 		authService,
 	)
 }
