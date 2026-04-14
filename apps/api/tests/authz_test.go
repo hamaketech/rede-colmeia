@@ -15,6 +15,10 @@ import (
 )
 
 func newAuthenticatedHandler() http.Handler {
+	return newAuthenticatedHandlerWithResetExposure(true)
+}
+
+func newAuthenticatedHandlerWithResetExposure(exposeResetToken bool) http.Handler {
 	authService := auth.NewService(auth.NewInMemoryRepository())
 	if err := authService.SeedCredentials(
 		context.Background(),
@@ -22,7 +26,7 @@ func newAuthenticatedHandler() http.Handler {
 	); err != nil {
 		panic(err)
 	}
-	authHandler := auth.NewHandler(authService, true)
+	authHandler := auth.NewHandler(authService, exposeResetToken)
 	return apphttp.NewRouter(
 		users.NewHandler(users.NewService(users.NewInMemoryRepository())),
 		authHandler,
@@ -371,5 +375,50 @@ func TestRegisterRejectsShortPassword(t *testing.T) {
 
 	if !strings.Contains(registerRecorder.Body.String(), "password must be at least 8 characters") {
 		t.Fatalf("expected password length error message, got %q", registerRecorder.Body.String())
+	}
+}
+
+func TestPasswordResetRequestThrottlesRepeatedCalls(t *testing.T) {
+	handler := newAuthenticatedHandler()
+
+	requestBody := []byte(`{"email":"contributor@redecolmeia.dev"}`)
+	firstRequest := httptest.NewRequest(http.MethodPost, "/api/v1/auth/password-reset/request", bytes.NewBuffer(requestBody))
+	firstRecorder := httptest.NewRecorder()
+	handler.ServeHTTP(firstRecorder, firstRequest)
+	if firstRecorder.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, firstRecorder.Code)
+	}
+
+	secondRequest := httptest.NewRequest(http.MethodPost, "/api/v1/auth/password-reset/request", bytes.NewBuffer(requestBody))
+	secondRecorder := httptest.NewRecorder()
+	handler.ServeHTTP(secondRecorder, secondRequest)
+	if secondRecorder.Code != http.StatusTooManyRequests {
+		t.Fatalf("expected status %d, got %d", http.StatusTooManyRequests, secondRecorder.Code)
+	}
+}
+
+func TestPasswordResetRequestDoesNotExposeTokenOutsideDev(t *testing.T) {
+	handler := newAuthenticatedHandlerWithResetExposure(false)
+
+	requestBody := []byte(`{"email":"contributor@redecolmeia.dev"}`)
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/auth/password-reset/request", bytes.NewBuffer(requestBody))
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, recorder.Code)
+	}
+
+	var payload map[string]any
+	if err := json.NewDecoder(recorder.Body).Decode(&payload); err != nil {
+		t.Fatalf("expected valid payload, got %v", err)
+	}
+
+	data, ok := payload["data"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected data object, got %+v", payload["data"])
+	}
+	if _, hasToken := data["resetToken"]; hasToken {
+		t.Fatalf("expected resetToken to be hidden when exposure is disabled")
 	}
 }

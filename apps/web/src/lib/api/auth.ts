@@ -11,6 +11,15 @@ type AuthData = {
   actor: AuthActor;
 };
 
+export type AuthSession = {
+  id: string;
+  role: AuthRole;
+  expiresAt: string;
+  revokedAt?: string;
+  isCurrent: boolean;
+  isActive: boolean;
+};
+
 export function register(payload: { email: string; password: string; role?: AuthRole }) {
   return apiPost<AuthData, { email: string; password: string; role?: AuthRole }>(
     "/api/v1/auth/register",
@@ -50,4 +59,12 @@ export function confirmPasswordReset(payload: { token: string; newPassword: stri
     "/api/v1/auth/password-reset/confirm",
     payload
   );
+}
+
+export function listSessions() {
+  return apiGet<{ sessions: AuthSession[] }>("/api/v1/auth/sessions");
+}
+
+export function revokeSessionByID(payload: { sessionId: string }) {
+  return apiPost<{ message: string }, { sessionId: string }>("/api/v1/auth/sessions/revoke", payload);
 }

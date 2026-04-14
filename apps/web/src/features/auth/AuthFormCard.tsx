@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import type { AuthActor } from "@/lib/api/auth";
+import { Link } from "react-router-dom";
 
 type AuthMode = "login" | "register";
 
@@ -17,20 +18,7 @@ type AuthFormCardProps = {
   actor: AuthActor | null;
   formError: string | null;
   formInfo: string | null;
-  isDevEnvironment: boolean;
-  recoveryRequested: boolean;
-  resetToken: string;
-  setResetToken: (value: string) => void;
-  resetPassword: string;
-  setResetPassword: (value: string) => void;
-  issuedResetToken: string | null;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
-  onLoadSession: () => void;
-  onLogout: () => void;
-  onLogoutAll: () => void;
-  onRotateSession: () => void;
-  onRequestRecovery: () => void;
-  onConfirmRecovery: () => void;
   t: (key: string) => string;
 };
 
@@ -45,20 +33,7 @@ export function AuthFormCard({
   actor,
   formError,
   formInfo,
-  isDevEnvironment,
-  recoveryRequested,
-  resetToken,
-  setResetToken,
-  resetPassword,
-  setResetPassword,
-  issuedResetToken,
   onSubmit,
-  onLoadSession,
-  onLogout,
-  onLogoutAll,
-  onRotateSession,
-  onRequestRecovery,
-  onConfirmRecovery,
   t
 }: AuthFormCardProps) {
   return (
@@ -118,83 +93,19 @@ export function AuthFormCard({
           <Button type="submit" disabled={loading}>
             {mode === "login" ? t("auth.loginAction") : t("auth.registerAction")}
           </Button>
+          {mode === "login" ? (
+            <p className="auth-helper">
+              {t("auth.forgotPasswordHint")}{" "}
+              <Link className="auth-inline-link" to="/settings/security">
+                {t("auth.forgotPasswordAction")}
+              </Link>
+            </p>
+          ) : null}
         </form>
-
-        {isDevEnvironment ? (
-          <details className="auth-dev-tools">
-            <summary>{t("auth.devToolsToggle")}</summary>
-            <div className="stack">
-              <p className="auth-helper">{t("auth.devToolsHint")}</p>
-              <div className="meta-row">
-                <Button type="button" variant="secondary" onClick={onLoadSession} disabled={loading}>
-                  {t("auth.whoAmIAction")}
-                </Button>
-                <Button type="button" variant="ghost" onClick={onLogout} disabled={loading}>
-                  {t("auth.logoutAction")}
-                </Button>
-              </div>
-              <div className="meta-row">
-                <Button type="button" variant="ghost" onClick={onRotateSession} disabled={loading}>
-                  {t("auth.rotateAction")}
-                </Button>
-                <Button type="button" variant="ghost" onClick={onLogoutAll} disabled={loading}>
-                  {t("auth.logoutAllAction")}
-                </Button>
-              </div>
-              {actor ? (
-                <p>
-                  {t("auth.currentSession")}: <strong>{actor.email}</strong> ({actor.role})
-                </p>
-              ) : (
-                <p>{t("auth.noSessionHint")}</p>
-              )}
-
-              <section className="auth-recovery-panel stack" aria-live="polite">
-                <p className="auth-helper">{t("auth.recoveryHint")}</p>
-                <Button type="button" variant="secondary" onClick={onRequestRecovery} disabled={loading}>
-                  {t("auth.requestResetAction")}
-                </Button>
-                {recoveryRequested ? (
-                  <p className="auth-feedback auth-feedback-info">{t("auth.recoveryEmailReadyInfo")}</p>
-                ) : null}
-                <details className="auth-dev-reset-tools">
-                  <summary>{t("auth.devResetToolsToggle")}</summary>
-                  <div className="stack">
-                    <p className="auth-helper">{t("auth.devResetToolsHint")}</p>
-                    {issuedResetToken ? (
-                      <p className="auth-feedback auth-feedback-info">
-                        {t("auth.devResetTokenLabel")}: <code>{issuedResetToken}</code>
-                      </p>
-                    ) : null}
-                    <label className="field-label" htmlFor="auth-reset-token">
-                      {t("auth.resetTokenLabel")}
-                    </label>
-                    <Input
-                      id="auth-reset-token"
-                      type="text"
-                      placeholder={t("auth.resetTokenPlaceholder")}
-                      value={resetToken}
-                      onChange={(event) => setResetToken(event.target.value)}
-                    />
-                    <label className="field-label" htmlFor="auth-reset-password">
-                      {t("auth.newPasswordLabel")}
-                    </label>
-                    <Input
-                      id="auth-reset-password"
-                      type="password"
-                      autoComplete="new-password"
-                      placeholder={t("auth.newPasswordPlaceholder")}
-                      value={resetPassword}
-                      onChange={(event) => setResetPassword(event.target.value)}
-                    />
-                    <Button type="button" onClick={onConfirmRecovery} disabled={loading}>
-                      {t("auth.confirmResetAction")}
-                    </Button>
-                  </div>
-                </details>
-              </section>
-            </div>
-          </details>
+        {actor ? (
+          <p className="auth-helper">
+            {t("auth.currentSession")}: <strong>{actor.email}</strong> ({actor.role})
+          </p>
         ) : null}
       </CardContent>
     </Card>

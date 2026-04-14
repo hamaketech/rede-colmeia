@@ -6,12 +6,6 @@ import { MemoryRouter } from "react-router-dom";
 
 const loginMock = vi.fn();
 const registerMock = vi.fn();
-const logoutMock = vi.fn();
-const logoutAllMock = vi.fn();
-const rotateSessionMock = vi.fn();
-const whoAmIMock = vi.fn();
-const requestPasswordResetMock = vi.fn();
-const confirmPasswordResetMock = vi.fn();
 const navigateMock = vi.fn();
 let locationState: unknown = null;
 
@@ -26,13 +20,7 @@ vi.mock("react-router-dom", async () => {
 
 vi.mock("../src/lib/api/auth", () => ({
   login: (...args: unknown[]) => loginMock(...args),
-  register: (...args: unknown[]) => registerMock(...args),
-  logout: (...args: unknown[]) => logoutMock(...args),
-  logoutAll: (...args: unknown[]) => logoutAllMock(...args),
-  rotateSession: (...args: unknown[]) => rotateSessionMock(...args),
-  whoAmI: (...args: unknown[]) => whoAmIMock(...args),
-  requestPasswordReset: (...args: unknown[]) => requestPasswordResetMock(...args),
-  confirmPasswordReset: (...args: unknown[]) => confirmPasswordResetMock(...args)
+  register: (...args: unknown[]) => registerMock(...args)
 }));
 
 function renderPage() {
@@ -116,41 +104,10 @@ describe("Auth page", () => {
     expect(screen.getByText("A senha precisa ter pelo menos 8 caracteres.")).toBeInTheDocument();
   });
 
-  it("requests password reset and applies a new password", async () => {
-    requestPasswordResetMock.mockResolvedValue({
-      message: "token generated",
-      resetToken: "dev-token-123"
-    });
-    confirmPasswordResetMock.mockResolvedValue({
-      message: "password reset completed"
-    });
-
+  it("keeps advanced controls out of auth card", () => {
     renderPage();
-    fireEvent.change(screen.getByLabelText("E-mail"), {
-      target: { value: "new@redecolmeia.dev" }
-    });
-
-    fireEvent.click(screen.getByText("Ferramentas de reset"));
-    fireEvent.click(screen.getByRole("button", { name: "Solicitar recuperacao" }));
-    await waitFor(() => {
-      expect(requestPasswordResetMock).toHaveBeenCalledWith({ email: "new@redecolmeia.dev" });
-    });
-
-    fireEvent.click(screen.getByText("Ferramentas de reset"));
-    fireEvent.change(screen.getByLabelText("Token de recuperacao"), {
-      target: { value: "dev-token-123" }
-    });
-    fireEvent.change(screen.getByLabelText("Nova senha"), {
-      target: { value: "new-pass-123" }
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Aplicar nova senha" }));
-
-    await waitFor(() => {
-      expect(confirmPasswordResetMock).toHaveBeenCalledWith({
-        token: "dev-token-123",
-        newPassword: "new-pass-123"
-      });
-    });
+    expect(screen.queryByText("Ferramentas de desenvolvimento")).not.toBeInTheDocument();
+    expect(screen.getByText("Recuperacao e controles avancados agora ficam em:")).toBeInTheDocument();
   });
 
   it("shows required-session notice when redirected from protected route", () => {

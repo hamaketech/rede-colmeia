@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/mail"
 	"strings"
+	"sync"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
@@ -24,6 +25,7 @@ var (
 	ErrPasswordTooShort     = errors.New("password must be at least 8 characters")
 	ErrInvalidResetToken    = errors.New("password reset token is invalid")
 	ErrSessionForbidden     = errors.New("session does not belong to actor")
+	ErrResetRequestThrottled = errors.New("password reset request is throttled")
 )
 
 type Role string
@@ -57,6 +59,12 @@ type Service struct {
 	sessionTTL time.Duration
 	resetTTL   time.Duration
 	now        func() time.Time
+
+	resetDelivery      PasswordResetDelivery
+	sensitiveEventHook SensitiveEventHook
+	resetThrottleMu    sync.Mutex
+	resetRequestWindow time.Duration
+	resetRequestByMail map[string]time.Time
 }
 
 func NewService(repository Repository) *Service {
@@ -64,11 +72,31 @@ func NewService(repository Repository) *Service {
 		repository = NewInMemoryRepository()
 	}
 	return &Service{
-		repository: repository,
-		sessionTTL: 24 * time.Hour,
-		resetTTL:   30 * time.Minute,
-		now:        time.Now,
+		repository:         repository,
+		sessionTTL:         24 * time.Hour,
+		resetTTL:           30 * time.Minute,
+		now:                time.Now,
+		resetDelivery:      NoopPasswordResetDelivery{},
+		sensitiveEventHook: NoopSensitiveEventHook{},
+		resetRequestWindow: 1 * time.Minute,
+		resetRequestByMail: make(map[string]time.Time),
 	}
+}
+
+func (s *Service) SetPasswordResetDelivery(delivery PasswordResetDelivery) {
+	if delivery == nil {
+		s.resetDelivery = NoopPasswordResetDelivery{}
+		return
+	}
+	s.resetDelivery = delivery
+}
+
+func (s *Service) SetSensitiveEventHook(hook SensitiveEventHook) {
+	if hook == nil {
+		s.sensitiveEventHook = NoopSensitiveEventHook{}
+		return
+	}
+	s.sensitiveEventHook = hook
 }
 
 func (s *Service) SeedCredentials(ctx context.Context, rawCredentials string) error {
@@ -178,6 +206,7 @@ func (s *Service) Login(ctx context.Context, email string, password string) (str
 		Email:     actor.Email,
 		SessionID: sessionID,
 	})
+	s.emitSensitiveEvent(ctx, SensitiveEventLogin, actor.Email, sessionID)
 
 	return sessionID, actor, nil
 }
@@ -223,6 +252,7 @@ func (s *Service) LogoutAll(ctx context.Context, actor Actor) error {
 		Type:  "logout_all",
 		Email: actor.Email,
 	})
+	s.emitSensitiveEvent(ctx, SensitiveEventLogoutAll, actor.Email, "")
 	return nil
 }
 
@@ -266,6 +296,7 @@ func (s *Service) RevokeActorSession(ctx context.Context, actor Actor, sessionID
 		Email:     actor.Email,
 		SessionID: sessionID,
 	})
+	s.emitSensitiveEvent(ctx, SensitiveEventSessionRevoke, actor.Email, sessionID)
 	return nil
 }
 
@@ -290,11 +321,16 @@ func (s *Service) RotateSession(ctx context.Context, currentSessionID string, ac
 		SessionID: nextSessionID,
 		Meta:      "previous=" + currentSessionID,
 	})
+	s.emitSensitiveEvent(ctx, SensitiveEventSessionRotate, actor.Email, nextSessionID)
 	return nextSessionID, nil
 }
 
 func (s *Service) RequestPasswordReset(ctx context.Context, email string) (string, error) {
 	normalized := strings.ToLower(strings.TrimSpace(email))
+	if s.isResetRequestThrottled(normalized) {
+		return "", ErrResetRequestThrottled
+	}
+
 	credential, err := s.repository.FindCredentialByEmail(ctx, normalized)
 	if err != nil {
 		return "", nil
@@ -314,6 +350,17 @@ func (s *Service) RequestPasswordReset(ctx context.Context, email string) (strin
 		Type:  "password_reset_requested",
 		Email: credential.Email,
 	})
+	s.emitSensitiveEvent(ctx, SensitiveEventPasswordResetRequested, credential.Email, "")
+
+	if err := s.resetDelivery.SendPasswordReset(ctx, credential.Email, rawToken); err != nil {
+		_ = s.repository.InsertAuthEvent(ctx, AuthEvent{
+			Type:  "password_reset_delivery_failed",
+			Email: credential.Email,
+			Meta:  err.Error(),
+		})
+		return "", err
+	}
+
 	return rawToken, nil
 }
 
@@ -352,6 +399,7 @@ func (s *Service) ConfirmPasswordReset(ctx context.Context, token string, newPas
 		Type:  "password_reset_confirmed",
 		Email: resetToken.Email,
 	})
+	s.emitSensitiveEvent(ctx, SensitiveEventPasswordResetConfirmed, resetToken.Email, "")
 	return nil
 }
 
@@ -397,4 +445,30 @@ func isAllowedRole(role Role) bool {
 	default:
 		return false
 	}
+}
+
+func (s *Service) isResetRequestThrottled(email string) bool {
+	if email == "" {
+		return false
+	}
+
+	s.resetThrottleMu.Lock()
+	defer s.resetThrottleMu.Unlock()
+
+	now := s.now()
+	lastRequestAt, exists := s.resetRequestByMail[email]
+	if exists && now.Before(lastRequestAt.Add(s.resetRequestWindow)) {
+		return true
+	}
+	s.resetRequestByMail[email] = now
+	return false
+}
+
+func (s *Service) emitSensitiveEvent(ctx context.Context, eventType SensitiveEventType, email string, sessionID string) {
+	s.sensitiveEventHook.OnSensitiveEvent(ctx, SensitiveEvent{
+		Type:      eventType,
+		Email:     email,
+		SessionID: sessionID,
+		At:        s.now(),
+	})
 }

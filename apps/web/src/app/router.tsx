@@ -4,6 +4,7 @@ import { AuthPage } from "../features/auth/AuthPage";
 import { DashboardPage } from "../features/dashboard/DashboardPage";
 import { LandingPage } from "../features/landing/LandingPage";
 import { PartnersPage } from "../features/partners/PartnersPage";
+import { SecuritySettingsPage } from "../features/settings/SecuritySettingsPage";
 import { TransparencyPage } from "../features/transparency/TransparencyPage";
 import { RequireAuth } from "./RequireAuth";
 
@@ -18,6 +19,14 @@ export const router = createBrowserRouter([
         element: (
           <RequireAuth>
             <DashboardPage />
+          </RequireAuth>
+        )
+      },
+      {
+        path: "settings/security",
+        element: (
+          <RequireAuth>
+            <SecuritySettingsPage />
           </RequireAuth>
         )
       },

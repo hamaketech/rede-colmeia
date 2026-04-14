@@ -2,9 +2,11 @@ package auth
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 )
 
 func TestLoginAndAuthenticateSuccess(t *testing.T) {
@@ -203,5 +205,40 @@ func TestRevokeActorSessionRejectsOtherActorSession(t *testing.T) {
 	err = service.RevokeActorSession(context.Background(), actor, targetSessionID)
 	if err != ErrSessionForbidden {
 		t.Fatalf("expected error %v, got %v", ErrSessionForbidden, err)
+	}
+}
+
+func TestRequestPasswordResetIsThrottled(t *testing.T) {
+	service := NewService(NewInMemoryRepository())
+	if err := service.SeedCredentials(context.Background(), "admin:admin@redecolmeia.dev:admin-pass"); err != nil {
+		t.Fatalf("expected nil error while seeding credentials, got %v", err)
+	}
+
+	fixedNow := time.Now()
+	service.now = func() time.Time { return fixedNow }
+
+	if _, err := service.RequestPasswordReset(context.Background(), "admin@redecolmeia.dev"); err != nil {
+		t.Fatalf("expected nil error on first request, got %v", err)
+	}
+	if _, err := service.RequestPasswordReset(context.Background(), "admin@redecolmeia.dev"); err != ErrResetRequestThrottled {
+		t.Fatalf("expected error %v, got %v", ErrResetRequestThrottled, err)
+	}
+}
+
+type failingResetDelivery struct{}
+
+func (failingResetDelivery) SendPasswordReset(_ context.Context, _ string, _ string) error {
+	return errors.New("delivery unavailable")
+}
+
+func TestRequestPasswordResetFailsWhenDeliveryFails(t *testing.T) {
+	service := NewService(NewInMemoryRepository())
+	if err := service.SeedCredentials(context.Background(), "admin:admin@redecolmeia.dev:admin-pass"); err != nil {
+		t.Fatalf("expected nil error while seeding credentials, got %v", err)
+	}
+	service.SetPasswordResetDelivery(failingResetDelivery{})
+
+	if _, err := service.RequestPasswordReset(context.Background(), "admin@redecolmeia.dev"); err == nil {
+		t.Fatalf("expected delivery error, got nil")
 	}
 }

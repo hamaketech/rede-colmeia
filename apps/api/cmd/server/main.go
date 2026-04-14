@@ -55,6 +55,18 @@ func main() {
 	}
 
 	authService := auth.NewService(authRepo)
+	if cfg.Environment != "dev" {
+		if cfg.ResetDeliveryWebhookURL == "" {
+			logger.Printf("warning: RESET_DELIVERY_WEBHOOK_URL is empty; password reset delivery is disabled")
+		}
+		authService.SetPasswordResetDelivery(
+			auth.NewWebhookResetDelivery(
+				cfg.ResetDeliveryWebhookURL,
+				cfg.ResetDeliveryToken,
+				logger,
+			),
+		)
+	}
 	if err := authService.SeedCredentials(context.Background(), cfg.AuthConfig); err != nil {
 		logger.Fatalf("seed auth credentials failed: %v", err)
 	}

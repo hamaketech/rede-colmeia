@@ -320,6 +320,10 @@ func (h *Handler) RequestPasswordReset(w http.ResponseWriter, r *http.Request) {
 
 	resetToken, err := h.service.RequestPasswordReset(r.Context(), payload.Email)
 	if err != nil {
+		if errors.Is(err, ErrResetRequestThrottled) {
+			writeError(w, http.StatusTooManyRequests, "rate_limited", "reset request is temporarily throttled", nil)
+			return
+		}
 		writeError(w, http.StatusInternalServerError, "internal_error", "could not create reset token", nil)
 		return
 	}

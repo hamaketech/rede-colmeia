@@ -41,20 +41,7 @@ export function AuthPage() {
         actor={auth.actor}
         formError={auth.formError}
         formInfo={auth.formInfo}
-        isDevEnvironment={auth.isDevEnvironment}
-        recoveryRequested={auth.recoveryRequested}
-        resetToken={auth.resetToken}
-        setResetToken={auth.setResetToken}
-        resetPassword={auth.resetPassword}
-        setResetPassword={auth.setResetPassword}
-        issuedResetToken={auth.issuedResetToken}
         onSubmit={handleSubmit}
-        onLoadSession={auth.loadCurrentSession}
-        onLogout={auth.clearCurrentSession}
-        onLogoutAll={auth.clearAllSessions}
-        onRotateSession={auth.rotateCurrentSession}
-        onRequestRecovery={auth.requestRecovery}
-        onConfirmRecovery={auth.confirmRecovery}
         t={t}
       />
     </section>

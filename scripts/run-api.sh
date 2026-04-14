@@ -31,10 +31,14 @@ fi
 
 export DATABASE_AUTH_TOKEN="$database_token"
 export AUTH_CREDENTIALS="${AUTH_CREDENTIALS:-$default_auth_credentials}"
+export APP_ENV="${APP_ENV:-$TARGET_ENV}"
 
 echo "starting API with environment: $TARGET_ENV"
 echo "using DATABASE_URL and DATABASE_AUTH_TOKEN from: $ENV_FILE"
 echo "using AUTH_CREDENTIALS from script default or shell override"
+if [[ "$TARGET_ENV" != "dev" ]]; then
+  echo "using reset delivery webhook: ${RESET_DELIVERY_WEBHOOK_URL:-<not-configured>}"
+fi
 
 cd "$ROOT_DIR/apps/api"
 exec go run ./cmd/server

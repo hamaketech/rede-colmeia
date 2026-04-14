@@ -111,7 +111,7 @@ export function DashboardPage() {
             <Link to="/transparency">{t("dashboard.actionTransparency")}</Link>
           </Button>
           <Button variant="ghost" asChild>
-            <Link to="/auth">{t("dashboard.actionAccount")}</Link>
+            <Link to="/settings/security">{t("dashboard.actionAccount")}</Link>
           </Button>
         </CardContent>
       </Card>
