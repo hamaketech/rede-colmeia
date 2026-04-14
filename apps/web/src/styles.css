@@ -366,6 +366,47 @@ select:focus-visible {
   color: color-mix(in srgb, var(--color-fg) 72%, transparent);
 }
 
+.auth-dev-tools {
+  border: 1px solid color-mix(in srgb, var(--color-border) 82%, transparent);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+  background: color-mix(in srgb, var(--color-surface-alt) 24%, transparent);
+}
+
+.auth-dev-tools summary {
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: color-mix(in srgb, var(--color-fg) 76%, transparent);
+}
+
+.auth-dev-tools[open] summary {
+  margin-bottom: var(--space-2);
+}
+
+.auth-recovery-panel {
+  border-top: 1px dashed color-mix(in srgb, var(--color-border) 75%, transparent);
+  padding-top: var(--space-3);
+}
+
+.auth-dev-reset-tools {
+  border: 1px solid color-mix(in srgb, var(--color-border) 82%, transparent);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+  background: color-mix(in srgb, var(--color-surface-alt) 24%, transparent);
+}
+
+.auth-dev-reset-tools summary {
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: color-mix(in srgb, var(--color-fg) 76%, transparent);
+}
+
+.auth-dev-reset-tools[open] summary {
+  margin-bottom: var(--space-2);
+}
+
 .ui-button {
   min-height: 44px;
   min-width: 44px;

@@ -58,7 +58,7 @@ func main() {
 	if err := authService.SeedCredentials(context.Background(), cfg.AuthConfig); err != nil {
 		logger.Fatalf("seed auth credentials failed: %v", err)
 	}
-	authHandler := auth.NewHandler(authService)
+	authHandler := auth.NewHandler(authService, cfg.Environment == "dev")
 	usersService := users.NewService(usersRepo)
 	usersHandler := users.NewHandler(usersService)
 

@@ -1,19 +1,50 @@
+import type { ApiResponse, ApiError as ContractApiError } from "../../../../../packages/contracts/src";
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080";
 
 export type ApiError = {
+  code?: ContractApiError["code"];
   message: string;
   status: number;
+  requestId?: string;
+  details?: ContractApiError["details"];
 };
 
+function isEnvelope<TData>(payload: unknown): payload is ApiResponse<TData> {
+  return typeof payload === "object" && payload !== null && "ok" in payload;
+}
+
 async function parseResponse<T>(response: Response): Promise<T> {
-  if (!response.ok) {
-    const text = await response.text();
+  const rawBody = await response.text();
+  let parsedBody: unknown = null;
+  if (rawBody) {
+    try {
+      parsedBody = JSON.parse(rawBody);
+    } catch {
+      parsedBody = null;
+    }
+  }
+
+  if (isEnvelope<T>(parsedBody)) {
+    if (parsedBody.ok) {
+      return parsedBody.data;
+    }
     throw {
-      message: text || `request failed: ${response.statusText}`,
+      status: response.status,
+      code: parsedBody.error.code,
+      message: parsedBody.error.message,
+      requestId: parsedBody.error.requestId,
+      details: parsedBody.error.details
+    } as ApiError;
+  }
+
+  if (!response.ok) {
+    throw {
+      message: rawBody || `request failed: ${response.statusText}`,
       status: response.status
     } as ApiError;
   }
-  return (await response.json()) as T;
+  return parsedBody as T;
 }
 
 export async function apiGet<T>(path: string): Promise<T> {

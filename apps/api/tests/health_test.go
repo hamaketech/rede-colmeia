@@ -16,7 +16,7 @@ func TestHealthEndpoint(t *testing.T) {
 	if err := authService.SeedCredentials(context.Background(), "contributor:test@redecolmeia.dev:test-pass"); err != nil {
 		t.Fatalf("expected nil error while seeding credentials, got %v", err)
 	}
-	authHandler := auth.NewHandler(authService)
+	authHandler := auth.NewHandler(authService, true)
 	handler := apphttp.NewRouter(
 		users.NewHandler(users.NewService(users.NewInMemoryRepository())),
 		authHandler,

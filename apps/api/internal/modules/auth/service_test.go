@@ -96,3 +96,54 @@ func TestRegisterDuplicateCredential(t *testing.T) {
 		t.Fatalf("expected error %v, got %v", ErrCredentialAlreadyExists, err)
 	}
 }
+
+func TestLogoutAllRevokesEverySession(t *testing.T) {
+	service := NewService(NewInMemoryRepository())
+	if err := service.SeedCredentials(context.Background(), "admin:admin@redecolmeia.dev:admin-pass"); err != nil {
+		t.Fatalf("expected nil error while seeding credentials, got %v", err)
+	}
+
+	firstSessionID, actor, err := service.Login(context.Background(), "admin@redecolmeia.dev", "admin-pass")
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	secondSessionID, _, err := service.Login(context.Background(), "admin@redecolmeia.dev", "admin-pass")
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+
+	if err := service.LogoutAll(context.Background(), actor); err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+
+	for _, sessionID := range []string{firstSessionID, secondSessionID} {
+		request := httptest.NewRequest(http.MethodGet, "/api/v1/auth/whoami", nil)
+		request.AddCookie(&http.Cookie{Name: SessionCookieName, Value: sessionID})
+		if _, authErr := service.Authenticate(request); authErr != ErrInvalidSession {
+			t.Fatalf("expected error %v, got %v", ErrInvalidSession, authErr)
+		}
+	}
+}
+
+func TestPasswordResetFlow(t *testing.T) {
+	service := NewService(NewInMemoryRepository())
+	if err := service.SeedCredentials(context.Background(), "admin:admin@redecolmeia.dev:admin-pass"); err != nil {
+		t.Fatalf("expected nil error while seeding credentials, got %v", err)
+	}
+
+	resetToken, err := service.RequestPasswordReset(context.Background(), "admin@redecolmeia.dev")
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	if resetToken == "" {
+		t.Fatalf("expected reset token to be generated")
+	}
+
+	if err := service.ConfirmPasswordReset(context.Background(), resetToken, "new-admin-pass"); err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+
+	if _, _, err := service.Login(context.Background(), "admin@redecolmeia.dev", "new-admin-pass"); err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+}

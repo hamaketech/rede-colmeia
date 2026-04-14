@@ -26,7 +26,11 @@ func NewRouter(usersHandler http.Handler, authHandler *auth.Handler, authService
 
 	mux.HandleFunc("/api/v1/auth/login", authHandler.Login)
 	mux.HandleFunc("/api/v1/auth/register", authHandler.Register)
+	mux.HandleFunc("/api/v1/auth/password-reset/request", authHandler.RequestPasswordReset)
+	mux.HandleFunc("/api/v1/auth/password-reset/confirm", authHandler.ConfirmPasswordReset)
 	mux.Handle("/api/v1/auth/logout", requireAnyAuthenticated(http.HandlerFunc(authHandler.Logout)))
+	mux.Handle("/api/v1/auth/logout-all", requireAnyAuthenticated(http.HandlerFunc(authHandler.LogoutAll)))
+	mux.Handle("/api/v1/auth/session/rotate", requireAnyAuthenticated(http.HandlerFunc(authHandler.RotateSession)))
 	mux.Handle("/api/v1/auth/whoami", requireAnyAuthenticated(http.HandlerFunc(authHandler.WhoAmI)))
 	mux.Handle("/api/v1/users/ping", requireOperator(usersHandler))
 	return mux

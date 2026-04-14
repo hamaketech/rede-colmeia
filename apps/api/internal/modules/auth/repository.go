@@ -14,6 +14,7 @@ var (
 	ErrCredentialNotFound      = errors.New("credential not found")
 	ErrCredentialAlreadyExists = errors.New("credential already exists")
 	ErrSessionNotFound         = errors.New("session not found")
+	ErrPasswordResetNotFound   = errors.New("password reset token not found")
 )
 
 type StoredCredential struct {
@@ -29,19 +30,41 @@ type StoredSession struct {
 	RevokedAt *time.Time
 }
 
+type StoredPasswordResetToken struct {
+	TokenHash string
+	Email     string
+	ExpiresAt time.Time
+	UsedAt    *time.Time
+}
+
+type AuthEvent struct {
+	Type      string
+	Email     string
+	SessionID string
+	Meta      string
+}
+
 type Repository interface {
 	UpsertCredential(context.Context, StoredCredential) error
 	CreateCredential(context.Context, StoredCredential) error
 	FindCredentialByEmail(context.Context, string) (StoredCredential, error)
+	UpdateCredentialPassword(context.Context, string, string) error
 	InsertSession(context.Context, StoredSession) error
 	FindSessionByID(context.Context, string) (StoredSession, error)
 	RevokeSession(context.Context, string) error
+	RevokeSessionsByEmail(context.Context, string) error
 	RevokeExpiredSessions(context.Context, time.Time) error
+	CreatePasswordResetToken(context.Context, StoredPasswordResetToken) error
+	FindPasswordResetToken(context.Context, string) (StoredPasswordResetToken, error)
+	ConsumePasswordResetToken(context.Context, string, time.Time) error
+	InsertAuthEvent(context.Context, AuthEvent) error
 }
 
 type InMemoryRepository struct {
 	credentials map[string]StoredCredential
 	sessions    map[string]StoredSession
+	resetTokens map[string]StoredPasswordResetToken
+	events      []AuthEvent
 	mutex       sync.RWMutex
 }
 
@@ -49,6 +72,8 @@ func NewInMemoryRepository() *InMemoryRepository {
 	return &InMemoryRepository{
 		credentials: map[string]StoredCredential{},
 		sessions:    map[string]StoredSession{},
+		resetTokens: map[string]StoredPasswordResetToken{},
+		events:      []AuthEvent{},
 	}
 }
 
@@ -76,6 +101,18 @@ func (r *InMemoryRepository) CreateCredential(_ context.Context, credential Stor
 		return ErrCredentialAlreadyExists
 	}
 	r.credentials[credential.Email] = credential
+	return nil
+}
+
+func (r *InMemoryRepository) UpdateCredentialPassword(_ context.Context, email string, passwordHash string) error {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+	credential, ok := r.credentials[email]
+	if !ok {
+		return ErrCredentialNotFound
+	}
+	credential.PasswordHash = passwordHash
+	r.credentials[email] = credential
 	return nil
 }
 
@@ -109,6 +146,21 @@ func (r *InMemoryRepository) RevokeSession(_ context.Context, sessionID string) 
 	return nil
 }
 
+func (r *InMemoryRepository) RevokeSessionsByEmail(_ context.Context, email string) error {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+	now := time.Now().UTC()
+	for sessionID, session := range r.sessions {
+		if session.Actor.Email != email || session.RevokedAt != nil {
+			continue
+		}
+		revokedAt := now
+		session.RevokedAt = &revokedAt
+		r.sessions[sessionID] = session
+	}
+	return nil
+}
+
 func (r *InMemoryRepository) RevokeExpiredSessions(_ context.Context, now time.Time) error {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
@@ -119,6 +171,43 @@ func (r *InMemoryRepository) RevokeExpiredSessions(_ context.Context, now time.T
 			r.sessions[sessionID] = session
 		}
 	}
+	return nil
+}
+
+func (r *InMemoryRepository) CreatePasswordResetToken(_ context.Context, token StoredPasswordResetToken) error {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+	r.resetTokens[token.TokenHash] = token
+	return nil
+}
+
+func (r *InMemoryRepository) FindPasswordResetToken(_ context.Context, tokenHash string) (StoredPasswordResetToken, error) {
+	r.mutex.RLock()
+	defer r.mutex.RUnlock()
+	token, ok := r.resetTokens[tokenHash]
+	if !ok {
+		return StoredPasswordResetToken{}, ErrPasswordResetNotFound
+	}
+	return token, nil
+}
+
+func (r *InMemoryRepository) ConsumePasswordResetToken(_ context.Context, tokenHash string, usedAt time.Time) error {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+	token, ok := r.resetTokens[tokenHash]
+	if !ok {
+		return ErrPasswordResetNotFound
+	}
+	marked := usedAt.UTC()
+	token.UsedAt = &marked
+	r.resetTokens[tokenHash] = token
+	return nil
+}
+
+func (r *InMemoryRepository) InsertAuthEvent(_ context.Context, event AuthEvent) error {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+	r.events = append(r.events, event)
 	return nil
 }
 
@@ -170,6 +259,28 @@ func (r *SQLRepository) FindCredentialByEmail(ctx context.Context, email string)
 		Role:         Role(role),
 		PasswordHash: passwordHash,
 	}, nil
+}
+
+func (r *SQLRepository) UpdateCredentialPassword(ctx context.Context, email string, passwordHash string) error {
+	result, err := r.db.ExecContext(
+		ctx,
+		`UPDATE auth_credentials
+		 SET password_hash = ?, updated_at = CURRENT_TIMESTAMP
+		 WHERE email = ?`,
+		passwordHash,
+		email,
+	)
+	if err != nil {
+		return fmt.Errorf("update credential password: %w", err)
+	}
+	affectedRows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("read rows affected for credential update: %w", err)
+	}
+	if affectedRows == 0 {
+		return ErrCredentialNotFound
+	}
+	return nil
 }
 
 func (r *SQLRepository) CreateCredential(ctx context.Context, credential StoredCredential) error {
@@ -264,6 +375,21 @@ func (r *SQLRepository) RevokeSession(ctx context.Context, sessionID string) err
 	return nil
 }
 
+func (r *SQLRepository) RevokeSessionsByEmail(ctx context.Context, email string) error {
+	_, err := r.db.ExecContext(
+		ctx,
+		`UPDATE auth_sessions
+		 SET revoked_at = COALESCE(revoked_at, ?)
+		 WHERE email = ?`,
+		time.Now().UTC().Format(time.RFC3339),
+		email,
+	)
+	if err != nil {
+		return fmt.Errorf("revoke sessions by email: %w", err)
+	}
+	return nil
+}
+
 func (r *SQLRepository) RevokeExpiredSessions(ctx context.Context, now time.Time) error {
 	_, err := r.db.ExecContext(
 		ctx,
@@ -275,6 +401,97 @@ func (r *SQLRepository) RevokeExpiredSessions(ctx context.Context, now time.Time
 	)
 	if err != nil {
 		return fmt.Errorf("revoke expired sessions: %w", err)
+	}
+	return nil
+}
+
+func (r *SQLRepository) CreatePasswordResetToken(ctx context.Context, token StoredPasswordResetToken) error {
+	_, err := r.db.ExecContext(
+		ctx,
+		`INSERT INTO auth_password_reset_tokens(token_hash, email, expires_at, created_at)
+		 VALUES (?, ?, ?, CURRENT_TIMESTAMP)`,
+		token.TokenHash,
+		token.Email,
+		token.ExpiresAt.UTC().Format(time.RFC3339),
+	)
+	if err != nil {
+		return fmt.Errorf("create password reset token: %w", err)
+	}
+	return nil
+}
+
+func (r *SQLRepository) FindPasswordResetToken(ctx context.Context, tokenHash string) (StoredPasswordResetToken, error) {
+	var email string
+	var expiresAtRaw any
+	var usedAtRaw any
+	err := r.db.QueryRowContext(
+		ctx,
+		`SELECT email, expires_at, used_at
+		 FROM auth_password_reset_tokens
+		 WHERE token_hash = ?`,
+		tokenHash,
+	).Scan(&email, &expiresAtRaw, &usedAtRaw)
+	if errors.Is(err, sql.ErrNoRows) {
+		return StoredPasswordResetToken{}, ErrPasswordResetNotFound
+	}
+	if err != nil {
+		return StoredPasswordResetToken{}, fmt.Errorf("find password reset token: %w", err)
+	}
+	expiresAt, err := parseTimeValue(expiresAtRaw)
+	if err != nil {
+		return StoredPasswordResetToken{}, fmt.Errorf("parse reset token expires_at: %w", err)
+	}
+	var usedAt *time.Time
+	if usedAtRaw != nil {
+		parsedUsedAt, parseErr := parseTimeValue(usedAtRaw)
+		if parseErr != nil {
+			return StoredPasswordResetToken{}, fmt.Errorf("parse reset token used_at: %w", parseErr)
+		}
+		usedAt = &parsedUsedAt
+	}
+
+	return StoredPasswordResetToken{
+		TokenHash: tokenHash,
+		Email:     email,
+		ExpiresAt: expiresAt,
+		UsedAt:    usedAt,
+	}, nil
+}
+
+func (r *SQLRepository) ConsumePasswordResetToken(ctx context.Context, tokenHash string, usedAt time.Time) error {
+	result, err := r.db.ExecContext(
+		ctx,
+		`UPDATE auth_password_reset_tokens
+		 SET used_at = COALESCE(used_at, ?)
+		 WHERE token_hash = ?`,
+		usedAt.UTC().Format(time.RFC3339),
+		tokenHash,
+	)
+	if err != nil {
+		return fmt.Errorf("consume password reset token: %w", err)
+	}
+	affectedRows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("read rows affected for reset token consume: %w", err)
+	}
+	if affectedRows == 0 {
+		return ErrPasswordResetNotFound
+	}
+	return nil
+}
+
+func (r *SQLRepository) InsertAuthEvent(ctx context.Context, event AuthEvent) error {
+	_, err := r.db.ExecContext(
+		ctx,
+		`INSERT INTO auth_events(type, email, session_id, meta, created_at)
+		 VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+		event.Type,
+		event.Email,
+		event.SessionID,
+		event.Meta,
+	)
+	if err != nil {
+		return fmt.Errorf("insert auth event: %w", err)
 	}
 	return nil
 }

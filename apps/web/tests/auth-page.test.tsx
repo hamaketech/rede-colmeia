@@ -6,13 +6,21 @@ import { vi } from "vitest";
 const loginMock = vi.fn();
 const registerMock = vi.fn();
 const logoutMock = vi.fn();
+const logoutAllMock = vi.fn();
+const rotateSessionMock = vi.fn();
 const whoAmIMock = vi.fn();
+const requestPasswordResetMock = vi.fn();
+const confirmPasswordResetMock = vi.fn();
 
 vi.mock("../src/lib/api/auth", () => ({
   login: (...args: unknown[]) => loginMock(...args),
   register: (...args: unknown[]) => registerMock(...args),
   logout: (...args: unknown[]) => logoutMock(...args),
-  whoAmI: (...args: unknown[]) => whoAmIMock(...args)
+  logoutAll: (...args: unknown[]) => logoutAllMock(...args),
+  rotateSession: (...args: unknown[]) => rotateSessionMock(...args),
+  whoAmI: (...args: unknown[]) => whoAmIMock(...args),
+  requestPasswordReset: (...args: unknown[]) => requestPasswordResetMock(...args),
+  confirmPasswordReset: (...args: unknown[]) => confirmPasswordResetMock(...args)
 }));
 
 function renderPage() {
@@ -30,7 +38,6 @@ describe("Auth page", () => {
 
   it("submits login credentials", async () => {
     loginMock.mockResolvedValue({
-      status: "ok",
       actor: { email: "admin@redecolmeia.dev", role: "admin" }
     });
 
@@ -54,7 +61,6 @@ describe("Auth page", () => {
 
   it("submits registration payload when register tab is selected", async () => {
     registerMock.mockResolvedValue({
-      status: "created",
       actor: { email: "new@redecolmeia.dev", role: "contributor" }
     });
 
@@ -92,5 +98,42 @@ describe("Auth page", () => {
 
     expect(registerMock).not.toHaveBeenCalled();
     expect(screen.getByText("A senha precisa ter pelo menos 8 caracteres.")).toBeInTheDocument();
+  });
+
+  it("requests password reset and applies a new password", async () => {
+    requestPasswordResetMock.mockResolvedValue({
+      message: "token generated",
+      resetToken: "dev-token-123"
+    });
+    confirmPasswordResetMock.mockResolvedValue({
+      message: "password reset completed"
+    });
+
+    renderPage();
+    fireEvent.change(screen.getByLabelText("E-mail"), {
+      target: { value: "new@redecolmeia.dev" }
+    });
+
+    fireEvent.click(screen.getByText("Ferramentas de reset"));
+    fireEvent.click(screen.getByRole("button", { name: "Solicitar recuperacao" }));
+    await waitFor(() => {
+      expect(requestPasswordResetMock).toHaveBeenCalledWith({ email: "new@redecolmeia.dev" });
+    });
+
+    fireEvent.click(screen.getByText("Ferramentas de desenvolvimento"));
+    fireEvent.change(screen.getByLabelText("Token de recuperacao"), {
+      target: { value: "dev-token-123" }
+    });
+    fireEvent.change(screen.getByLabelText("Nova senha"), {
+      target: { value: "new-pass-123" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Aplicar nova senha" }));
+
+    await waitFor(() => {
+      expect(confirmPasswordResetMock).toHaveBeenCalledWith({
+        token: "dev-token-123",
+        newPassword: "new-pass-123"
+      });
+    });
   });
 });

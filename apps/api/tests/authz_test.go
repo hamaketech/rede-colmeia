@@ -3,6 +3,7 @@ package tests
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -21,7 +22,7 @@ func newAuthenticatedHandler() http.Handler {
 	); err != nil {
 		panic(err)
 	}
-	authHandler := auth.NewHandler(authService)
+	authHandler := auth.NewHandler(authService, true)
 	return apphttp.NewRouter(
 		users.NewHandler(users.NewService(users.NewInMemoryRepository())),
 		authHandler,
@@ -171,6 +172,122 @@ func TestRegisterAndLoginEndpointFlow(t *testing.T) {
 
 	if whoAmIRecorder.Code != http.StatusOK {
 		t.Fatalf("expected status %d, got %d", http.StatusOK, whoAmIRecorder.Code)
+	}
+}
+
+func TestLogoutAllRevokesEverySession(t *testing.T) {
+	handler := newAuthenticatedHandler()
+	firstCookie := loginAndGetSessionCookie(t, handler, "contributor@redecolmeia.dev", "contributor-pass")
+	secondCookie := loginAndGetSessionCookie(t, handler, "contributor@redecolmeia.dev", "contributor-pass")
+
+	logoutAllRequest := httptest.NewRequest(http.MethodPost, "/api/v1/auth/logout-all", nil)
+	logoutAllRequest.AddCookie(firstCookie)
+	logoutAllRecorder := httptest.NewRecorder()
+	handler.ServeHTTP(logoutAllRecorder, logoutAllRequest)
+	if logoutAllRecorder.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, logoutAllRecorder.Code)
+	}
+
+	for _, cookie := range []*http.Cookie{firstCookie, secondCookie} {
+		pingRequest := httptest.NewRequest(http.MethodGet, "/api/v1/users/ping", nil)
+		pingRequest.AddCookie(cookie)
+		pingRecorder := httptest.NewRecorder()
+		handler.ServeHTTP(pingRecorder, pingRequest)
+		if pingRecorder.Code != http.StatusUnauthorized {
+			t.Fatalf("expected status %d, got %d", http.StatusUnauthorized, pingRecorder.Code)
+		}
+	}
+}
+
+func TestRotateSessionInvalidatesPreviousCookie(t *testing.T) {
+	handler := newAuthenticatedHandler()
+	sessionCookie := loginAndGetSessionCookie(t, handler, "contributor@redecolmeia.dev", "contributor-pass")
+
+	rotateRequest := httptest.NewRequest(http.MethodPost, "/api/v1/auth/session/rotate", nil)
+	rotateRequest.AddCookie(sessionCookie)
+	rotateRecorder := httptest.NewRecorder()
+	handler.ServeHTTP(rotateRecorder, rotateRequest)
+	if rotateRecorder.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, rotateRecorder.Code)
+	}
+
+	var nextCookie *http.Cookie
+	for _, cookie := range rotateRecorder.Result().Cookies() {
+		if cookie.Name == auth.SessionCookieName {
+			nextCookie = cookie
+			break
+		}
+	}
+	if nextCookie == nil {
+		t.Fatalf("expected rotated cookie in response")
+	}
+
+	oldPingRequest := httptest.NewRequest(http.MethodGet, "/api/v1/users/ping", nil)
+	oldPingRequest.AddCookie(sessionCookie)
+	oldPingRecorder := httptest.NewRecorder()
+	handler.ServeHTTP(oldPingRecorder, oldPingRequest)
+	if oldPingRecorder.Code != http.StatusUnauthorized {
+		t.Fatalf("expected status %d, got %d", http.StatusUnauthorized, oldPingRecorder.Code)
+	}
+
+	newPingRequest := httptest.NewRequest(http.MethodGet, "/api/v1/users/ping", nil)
+	newPingRequest.AddCookie(nextCookie)
+	newPingRecorder := httptest.NewRecorder()
+	handler.ServeHTTP(newPingRecorder, newPingRequest)
+	if newPingRecorder.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, newPingRecorder.Code)
+	}
+}
+
+func TestPasswordResetRequestAndConfirmFlow(t *testing.T) {
+	handler := newAuthenticatedHandler()
+
+	requestResetBody := []byte(`{"email":"contributor@redecolmeia.dev"}`)
+	requestResetRequest := httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/auth/password-reset/request",
+		bytes.NewBuffer(requestResetBody),
+	)
+	requestResetRecorder := httptest.NewRecorder()
+	handler.ServeHTTP(requestResetRecorder, requestResetRequest)
+	if requestResetRecorder.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, requestResetRecorder.Code)
+	}
+
+	var resetPayload struct {
+		OK   bool `json:"ok"`
+		Data struct {
+			ResetToken string `json:"resetToken"`
+		} `json:"data"`
+	}
+	if err := json.NewDecoder(requestResetRecorder.Body).Decode(&resetPayload); err != nil {
+		t.Fatalf("expected valid reset response payload, got %v", err)
+	}
+	if !resetPayload.OK || resetPayload.Data.ResetToken == "" {
+		t.Fatalf("expected reset token in response payload")
+	}
+
+	confirmBody := []byte(`{"token":"` + resetPayload.Data.ResetToken + `","newPassword":"brand-new-pass"}`)
+	confirmRequest := httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/auth/password-reset/confirm",
+		bytes.NewBuffer(confirmBody),
+	)
+	confirmRecorder := httptest.NewRecorder()
+	handler.ServeHTTP(confirmRecorder, confirmRequest)
+	if confirmRecorder.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, confirmRecorder.Code)
+	}
+
+	loginRequest := httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/auth/login",
+		bytes.NewBuffer([]byte(`{"email":"contributor@redecolmeia.dev","password":"brand-new-pass"}`)),
+	)
+	loginRecorder := httptest.NewRecorder()
+	handler.ServeHTTP(loginRecorder, loginRequest)
+	if loginRecorder.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, loginRecorder.Code)
 	}
 }
 
