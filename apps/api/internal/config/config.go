@@ -6,15 +6,20 @@ type Config struct {
 	Port        string
 	SentryDSN   string
 	DatabaseURL string
-	AuthTokens  string
+	AuthConfig  string
 }
 
 func Load() Config {
+	authConfig := os.Getenv("AUTH_CREDENTIALS")
+	if authConfig == "" {
+		authConfig = os.Getenv("AUTH_TOKENS")
+	}
+
 	return Config{
 		Port:        getEnv("PORT", "8080"),
 		SentryDSN:   os.Getenv("SENTRY_DSN"),
 		DatabaseURL: os.Getenv("DATABASE_URL"),
-		AuthTokens:  os.Getenv("AUTH_TOKENS"),
+		AuthConfig:  authConfig,
 	}
 }
 

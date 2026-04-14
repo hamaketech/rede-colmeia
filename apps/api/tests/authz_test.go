@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"bytes"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -10,9 +11,42 @@ import (
 	"github.com/rede-colmeia/apps/api/internal/modules/users"
 )
 
+func newAuthenticatedHandler() http.Handler {
+	authService := auth.NewService(
+		"contributor:contributor@redecolmeia.dev:contributor-pass,partner:partner@redecolmeia.dev:partner-pass",
+	)
+	authHandler := auth.NewHandler(authService)
+	return apphttp.NewRouter(
+		users.NewHandler(users.NewService(users.NewInMemoryRepository())),
+		authHandler,
+		authService,
+	)
+}
+
+func loginAndGetSessionCookie(t *testing.T, handler http.Handler, email string, password string) *http.Cookie {
+	t.Helper()
+
+	body := []byte(`{"email":"` + email + `","password":"` + password + `"}`)
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", bytes.NewBuffer(body))
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, recorder.Code)
+	}
+
+	for _, cookie := range recorder.Result().Cookies() {
+		if cookie.Name == auth.SessionCookieName {
+			return cookie
+		}
+	}
+
+	t.Fatalf("expected auth session cookie to be set")
+	return nil
+}
+
 func TestUsersPingRequiresAuthorization(t *testing.T) {
-	authService := auth.NewService("contributor:token-contributor,partner:token-partner")
-	handler := apphttp.NewRouter(users.NewHandler(users.NewService(users.NewInMemoryRepository())), authService)
+	handler := newAuthenticatedHandler()
 	request := httptest.NewRequest(http.MethodGet, "/api/v1/users/ping", nil)
 	recorder := httptest.NewRecorder()
 
@@ -24,10 +58,16 @@ func TestUsersPingRequiresAuthorization(t *testing.T) {
 }
 
 func TestUsersPingAllowsContributor(t *testing.T) {
-	authService := auth.NewService("contributor:token-contributor,partner:token-partner")
-	handler := apphttp.NewRouter(users.NewHandler(users.NewService(users.NewInMemoryRepository())), authService)
+	handler := newAuthenticatedHandler()
+	sessionCookie := loginAndGetSessionCookie(
+		t,
+		handler,
+		"contributor@redecolmeia.dev",
+		"contributor-pass",
+	)
+
 	request := httptest.NewRequest(http.MethodGet, "/api/v1/users/ping", nil)
-	request.Header.Set("Authorization", "Bearer token-contributor")
+	request.AddCookie(sessionCookie)
 	recorder := httptest.NewRecorder()
 
 	handler.ServeHTTP(recorder, request)
@@ -38,15 +78,69 @@ func TestUsersPingAllowsContributor(t *testing.T) {
 }
 
 func TestUsersPingRejectsPartnerRole(t *testing.T) {
-	authService := auth.NewService("contributor:token-contributor,partner:token-partner")
-	handler := apphttp.NewRouter(users.NewHandler(users.NewService(users.NewInMemoryRepository())), authService)
+	handler := newAuthenticatedHandler()
+	sessionCookie := loginAndGetSessionCookie(
+		t,
+		handler,
+		"partner@redecolmeia.dev",
+		"partner-pass",
+	)
+
 	request := httptest.NewRequest(http.MethodGet, "/api/v1/users/ping", nil)
-	request.Header.Set("Authorization", "Bearer token-partner")
+	request.AddCookie(sessionCookie)
 	recorder := httptest.NewRecorder()
 
 	handler.ServeHTTP(recorder, request)
 
 	if recorder.Code != http.StatusForbidden {
 		t.Fatalf("expected status %d, got %d", http.StatusForbidden, recorder.Code)
+	}
+}
+
+func TestWhoAmIReturnsSessionActor(t *testing.T) {
+	handler := newAuthenticatedHandler()
+	sessionCookie := loginAndGetSessionCookie(
+		t,
+		handler,
+		"contributor@redecolmeia.dev",
+		"contributor-pass",
+	)
+
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/auth/whoami", nil)
+	request.AddCookie(sessionCookie)
+	recorder := httptest.NewRecorder()
+
+	handler.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, recorder.Code)
+	}
+}
+
+func TestLogoutRevokesSession(t *testing.T) {
+	handler := newAuthenticatedHandler()
+	sessionCookie := loginAndGetSessionCookie(
+		t,
+		handler,
+		"contributor@redecolmeia.dev",
+		"contributor-pass",
+	)
+
+	logoutRequest := httptest.NewRequest(http.MethodPost, "/api/v1/auth/logout", nil)
+	logoutRequest.AddCookie(sessionCookie)
+	logoutRecorder := httptest.NewRecorder()
+	handler.ServeHTTP(logoutRecorder, logoutRequest)
+
+	if logoutRecorder.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, logoutRecorder.Code)
+	}
+
+	pingRequest := httptest.NewRequest(http.MethodGet, "/api/v1/users/ping", nil)
+	pingRequest.AddCookie(sessionCookie)
+	pingRecorder := httptest.NewRecorder()
+	handler.ServeHTTP(pingRecorder, pingRequest)
+
+	if pingRecorder.Code != http.StatusUnauthorized {
+		t.Fatalf("expected status %d, got %d", http.StatusUnauthorized, pingRecorder.Code)
 	}
 }

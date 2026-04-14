@@ -6,27 +6,48 @@ import (
 	"testing"
 )
 
-func TestAuthenticateSuccess(t *testing.T) {
-	service := NewService("admin:token-admin,contributor:token-contributor")
+func TestLoginAndAuthenticateSuccess(t *testing.T) {
+	service := NewService("admin:admin@redecolmeia.dev:admin-pass,contributor:alice@redecolmeia.dev:alice-pass")
+
+	sessionID, _, err := service.Login("admin@redecolmeia.dev", "admin-pass")
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+
 	request := httptest.NewRequest(http.MethodGet, "/api/v1/auth/whoami", nil)
-	request.Header.Set("Authorization", "Bearer token-admin")
+	request.AddCookie(&http.Cookie{
+		Name:  SessionCookieName,
+		Value: sessionID,
+	})
 
 	actor, err := service.Authenticate(request)
 	if err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}
 
+	if actor.Email != "admin@redecolmeia.dev" {
+		t.Fatalf("expected actor email %q, got %q", "admin@redecolmeia.dev", actor.Email)
+	}
 	if actor.Role != RoleAdmin {
 		t.Fatalf("expected role %q, got %q", RoleAdmin, actor.Role)
 	}
 }
 
-func TestAuthenticateMissingToken(t *testing.T) {
-	service := NewService("admin:token-admin")
+func TestLoginInvalidCredentials(t *testing.T) {
+	service := NewService("admin:admin@redecolmeia.dev:admin-pass")
+
+	_, _, err := service.Login("admin@redecolmeia.dev", "wrong-pass")
+	if err != ErrInvalidCredentials {
+		t.Fatalf("expected error %v, got %v", ErrInvalidCredentials, err)
+	}
+}
+
+func TestAuthenticateMissingSessionCookie(t *testing.T) {
+	service := NewService("admin:admin@redecolmeia.dev:admin-pass")
 	request := httptest.NewRequest(http.MethodGet, "/api/v1/auth/whoami", nil)
 
 	_, err := service.Authenticate(request)
-	if err != ErrMissingAuthorization {
-		t.Fatalf("expected error %v, got %v", ErrMissingAuthorization, err)
+	if err != ErrSessionCookieMissing {
+		t.Fatalf("expected error %v, got %v", ErrSessionCookieMissing, err)
 	}
 }

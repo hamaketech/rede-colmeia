@@ -45,12 +45,16 @@ func main() {
 		logger.Printf("users repository adapter: in-memory fallback")
 	}
 
-	authService := auth.NewService(cfg.AuthTokens)
+	authService := auth.NewService(cfg.AuthConfig)
+	authHandler := auth.NewHandler(authService)
 	usersService := users.NewService(usersRepo)
 	usersHandler := users.NewHandler(usersService)
 
-	router := apphttp.NewRouter(usersHandler, authService)
-	handler := middleware.WithRecovery(logger, middleware.WithRequestID(router))
+	router := apphttp.NewRouter(usersHandler, authHandler, authService)
+	handler := middleware.WithRecovery(
+		logger,
+		middleware.WithRequestID(middleware.WithAuditLogger(logger, authService, router)),
+	)
 
 	server := &http.Server{
 		Addr:              ":" + cfg.Port,

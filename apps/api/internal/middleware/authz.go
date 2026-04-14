@@ -25,7 +25,7 @@ func RequireRoles(authService *auth.Service, accepted ...auth.Role) func(http.Ha
 				return
 			}
 
-			next.ServeHTTP(w, r)
+			next.ServeHTTP(w, r.WithContext(auth.WithActor(r.Context(), actor)))
 		})
 	}
 }

@@ -11,8 +11,13 @@ import (
 )
 
 func TestHealthEndpoint(t *testing.T) {
-	authService := auth.NewService("contributor:test-token")
-	handler := apphttp.NewRouter(users.NewHandler(users.NewService(users.NewInMemoryRepository())), authService)
+	authService := auth.NewService("contributor:test@redecolmeia.dev:test-pass")
+	authHandler := auth.NewHandler(authService)
+	handler := apphttp.NewRouter(
+		users.NewHandler(users.NewService(users.NewInMemoryRepository())),
+		authHandler,
+		authService,
+	)
 	request := httptest.NewRequest(http.MethodGet, "/health", nil)
 	recorder := httptest.NewRecorder()
 

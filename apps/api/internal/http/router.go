@@ -8,7 +8,7 @@ import (
 	"github.com/rede-colmeia/apps/api/internal/modules/auth"
 )
 
-func NewRouter(usersHandler http.Handler, authService *auth.Service) http.Handler {
+func NewRouter(usersHandler http.Handler, authHandler *auth.Handler, authService *auth.Service) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]string{
@@ -24,14 +24,10 @@ func NewRouter(usersHandler http.Handler, authService *auth.Service) http.Handle
 		auth.RoleAdmin,
 	)
 
+	mux.HandleFunc("/api/v1/auth/login", authHandler.Login)
+	mux.Handle("/api/v1/auth/logout", requireAnyAuthenticated(http.HandlerFunc(authHandler.Logout)))
+	mux.Handle("/api/v1/auth/whoami", requireAnyAuthenticated(http.HandlerFunc(authHandler.WhoAmI)))
 	mux.Handle("/api/v1/users/ping", requireOperator(usersHandler))
-	mux.Handle("/api/v1/auth/whoami", requireAnyAuthenticated(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		actor, _ := authService.Authenticate(r)
-		writeJSON(w, http.StatusOK, map[string]string{
-			"status": "ok",
-			"role":   string(actor.Role),
-		})
-	})))
 	return mux
 }
 

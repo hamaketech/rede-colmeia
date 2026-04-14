@@ -16,7 +16,7 @@ Rede Colmeia is a decentralized mutual-aid platform where recurring contribution
 ```bash
 cd apps/api
 go test ./...
-AUTH_TOKENS=admin:dev-admin,contributor:dev-contributor go run ./cmd/server
+AUTH_CREDENTIALS=admin:admin@redecolmeia.dev:admin-pass,contributor:contributor@redecolmeia.dev:contributor-pass,partner:partner@redecolmeia.dev:partner-pass go run ./cmd/server
 ```
 
 ### Web
