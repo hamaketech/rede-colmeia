@@ -23,6 +23,7 @@ var (
 	ErrInvalidEmail         = errors.New("email is invalid")
 	ErrPasswordTooShort     = errors.New("password must be at least 8 characters")
 	ErrInvalidResetToken    = errors.New("password reset token is invalid")
+	ErrSessionForbidden     = errors.New("session does not belong to actor")
 )
 
 type Role string
@@ -41,6 +42,15 @@ type Actor struct {
 const SessionCookieName = "rede_colmeia_session"
 
 type actorContextKey struct{}
+
+type SessionView struct {
+	ID        string     `json:"id"`
+	Role      Role       `json:"role"`
+	ExpiresAt time.Time  `json:"expiresAt"`
+	RevokedAt *time.Time `json:"revokedAt,omitempty"`
+	IsCurrent bool       `json:"isCurrent"`
+	IsActive  bool       `json:"isActive"`
+}
 
 type Service struct {
 	repository Repository
@@ -212,6 +222,49 @@ func (s *Service) LogoutAll(ctx context.Context, actor Actor) error {
 	_ = s.repository.InsertAuthEvent(ctx, AuthEvent{
 		Type:  "logout_all",
 		Email: actor.Email,
+	})
+	return nil
+}
+
+func (s *Service) ListActorSessions(ctx context.Context, actor Actor, currentSessionID string) ([]SessionView, error) {
+	storedSessions, err := s.repository.ListSessionsByEmail(ctx, actor.Email)
+	if err != nil {
+		return nil, err
+	}
+
+	views := make([]SessionView, 0, len(storedSessions))
+	now := s.now()
+	for _, session := range storedSessions {
+		isCurrent := currentSessionID != "" && session.ID == currentSessionID
+		isActive := session.RevokedAt == nil && now.Before(session.ExpiresAt)
+		views = append(views, SessionView{
+			ID:        session.ID,
+			Role:      session.Actor.Role,
+			ExpiresAt: session.ExpiresAt,
+			RevokedAt: session.RevokedAt,
+			IsCurrent: isCurrent,
+			IsActive:  isActive,
+		})
+	}
+
+	return views, nil
+}
+
+func (s *Service) RevokeActorSession(ctx context.Context, actor Actor, sessionID string) error {
+	storedSession, err := s.repository.FindSessionByID(ctx, sessionID)
+	if err != nil {
+		return err
+	}
+	if storedSession.Actor.Email != actor.Email {
+		return ErrSessionForbidden
+	}
+	if err := s.repository.RevokeSession(ctx, sessionID); err != nil {
+		return err
+	}
+	_ = s.repository.InsertAuthEvent(ctx, AuthEvent{
+		Type:      "session_revoke",
+		Email:     actor.Email,
+		SessionID: sessionID,
 	})
 	return nil
 }

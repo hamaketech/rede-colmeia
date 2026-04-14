@@ -51,6 +51,7 @@ type Repository interface {
 	UpdateCredentialPassword(context.Context, string, string) error
 	InsertSession(context.Context, StoredSession) error
 	FindSessionByID(context.Context, string) (StoredSession, error)
+	ListSessionsByEmail(context.Context, string) ([]StoredSession, error)
 	RevokeSession(context.Context, string) error
 	RevokeSessionsByEmail(context.Context, string) error
 	RevokeExpiredSessions(context.Context, time.Time) error
@@ -131,6 +132,20 @@ func (r *InMemoryRepository) FindSessionByID(_ context.Context, sessionID string
 		return StoredSession{}, ErrSessionNotFound
 	}
 	return session, nil
+}
+
+func (r *InMemoryRepository) ListSessionsByEmail(_ context.Context, email string) ([]StoredSession, error) {
+	r.mutex.RLock()
+	defer r.mutex.RUnlock()
+
+	sessions := make([]StoredSession, 0)
+	for _, session := range r.sessions {
+		if session.Actor.Email != email {
+			continue
+		}
+		sessions = append(sessions, session)
+	}
+	return sessions, nil
 }
 
 func (r *InMemoryRepository) RevokeSession(_ context.Context, sessionID string) error {
@@ -358,6 +373,60 @@ func (r *SQLRepository) FindSessionByID(ctx context.Context, sessionID string) (
 		ExpiresAt: expiresAt.UTC(),
 		RevokedAt: revokedAt,
 	}, nil
+}
+
+func (r *SQLRepository) ListSessionsByEmail(ctx context.Context, email string) ([]StoredSession, error) {
+	rows, err := r.db.QueryContext(
+		ctx,
+		`SELECT id, role, expires_at, revoked_at
+		 FROM auth_sessions
+		 WHERE email = ?
+		 ORDER BY created_at DESC`,
+		email,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list sessions by email: %w", err)
+	}
+	defer rows.Close()
+
+	sessions := make([]StoredSession, 0)
+	for rows.Next() {
+		var sessionID string
+		var role string
+		var expiresAtRaw any
+		var revokedAtRaw any
+		if err := rows.Scan(&sessionID, &role, &expiresAtRaw, &revokedAtRaw); err != nil {
+			return nil, fmt.Errorf("scan session row: %w", err)
+		}
+		expiresAt, err := parseTimeValue(expiresAtRaw)
+		if err != nil {
+			return nil, fmt.Errorf("parse session expires_at: %w", err)
+		}
+
+		var revokedAt *time.Time
+		if revokedAtRaw != nil {
+			parsedRevokedAt, parseErr := parseTimeValue(revokedAtRaw)
+			if parseErr != nil {
+				return nil, fmt.Errorf("parse session revoked_at: %w", parseErr)
+			}
+			revokedAt = &parsedRevokedAt
+		}
+
+		sessions = append(sessions, StoredSession{
+			ID: sessionID,
+			Actor: Actor{
+				Email: email,
+				Role:  Role(role),
+			},
+			ExpiresAt: expiresAt.UTC(),
+			RevokedAt: revokedAt,
+		})
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate session rows: %w", err)
+	}
+
+	return sessions, nil
 }
 
 func (r *SQLRepository) RevokeSession(ctx context.Context, sessionID string) error {

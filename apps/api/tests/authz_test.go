@@ -291,6 +291,72 @@ func TestPasswordResetRequestAndConfirmFlow(t *testing.T) {
 	}
 }
 
+func TestSessionsEndpointListsActorSessions(t *testing.T) {
+	handler := newAuthenticatedHandler()
+	firstCookie := loginAndGetSessionCookie(t, handler, "contributor@redecolmeia.dev", "contributor-pass")
+	_ = loginAndGetSessionCookie(t, handler, "contributor@redecolmeia.dev", "contributor-pass")
+
+	sessionsRequest := httptest.NewRequest(http.MethodGet, "/api/v1/auth/sessions", nil)
+	sessionsRequest.AddCookie(firstCookie)
+	sessionsRecorder := httptest.NewRecorder()
+	handler.ServeHTTP(sessionsRecorder, sessionsRequest)
+
+	if sessionsRecorder.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, sessionsRecorder.Code)
+	}
+
+	var payload struct {
+		OK   bool `json:"ok"`
+		Data struct {
+			Sessions []struct {
+				ID        string `json:"id"`
+				IsCurrent bool   `json:"isCurrent"`
+			} `json:"sessions"`
+		} `json:"data"`
+	}
+	if err := json.NewDecoder(sessionsRecorder.Body).Decode(&payload); err != nil {
+		t.Fatalf("expected valid sessions payload, got %v", err)
+	}
+	if !payload.OK || len(payload.Data.Sessions) < 2 {
+		t.Fatalf("expected at least two sessions, got %+v", payload.Data.Sessions)
+	}
+}
+
+func TestRevokeSessionByIDInvalidatesOnlyTargetSession(t *testing.T) {
+	handler := newAuthenticatedHandler()
+	firstCookie := loginAndGetSessionCookie(t, handler, "contributor@redecolmeia.dev", "contributor-pass")
+	secondCookie := loginAndGetSessionCookie(t, handler, "contributor@redecolmeia.dev", "contributor-pass")
+
+	revokeRequest := httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/auth/sessions/revoke",
+		bytes.NewBuffer([]byte(`{"sessionId":"`+secondCookie.Value+`"}`)),
+	)
+	revokeRequest.AddCookie(firstCookie)
+	revokeRecorder := httptest.NewRecorder()
+	handler.ServeHTTP(revokeRecorder, revokeRequest)
+
+	if revokeRecorder.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, revokeRecorder.Code)
+	}
+
+	validRequest := httptest.NewRequest(http.MethodGet, "/api/v1/auth/whoami", nil)
+	validRequest.AddCookie(firstCookie)
+	validRecorder := httptest.NewRecorder()
+	handler.ServeHTTP(validRecorder, validRequest)
+	if validRecorder.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, validRecorder.Code)
+	}
+
+	revokedRequest := httptest.NewRequest(http.MethodGet, "/api/v1/auth/whoami", nil)
+	revokedRequest.AddCookie(secondCookie)
+	revokedRecorder := httptest.NewRecorder()
+	handler.ServeHTTP(revokedRecorder, revokedRequest)
+	if revokedRecorder.Code != http.StatusUnauthorized {
+		t.Fatalf("expected status %d, got %d", http.StatusUnauthorized, revokedRecorder.Code)
+	}
+}
+
 func TestRegisterRejectsShortPassword(t *testing.T) {
 	handler := newAuthenticatedHandler()
 

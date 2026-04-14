@@ -147,3 +147,61 @@ func TestPasswordResetFlow(t *testing.T) {
 		t.Fatalf("expected nil error, got %v", err)
 	}
 }
+
+func TestListActorSessionsMarksCurrentSession(t *testing.T) {
+	service := NewService(NewInMemoryRepository())
+	if err := service.SeedCredentials(context.Background(), "admin:admin@redecolmeia.dev:admin-pass"); err != nil {
+		t.Fatalf("expected nil error while seeding credentials, got %v", err)
+	}
+
+	currentSessionID, actor, err := service.Login(context.Background(), "admin@redecolmeia.dev", "admin-pass")
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	_, _, err = service.Login(context.Background(), "admin@redecolmeia.dev", "admin-pass")
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+
+	sessions, err := service.ListActorSessions(context.Background(), actor, currentSessionID)
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	if len(sessions) != 2 {
+		t.Fatalf("expected 2 sessions, got %d", len(sessions))
+	}
+
+	foundCurrent := false
+	for _, session := range sessions {
+		if session.ID == currentSessionID && session.IsCurrent {
+			foundCurrent = true
+		}
+	}
+	if !foundCurrent {
+		t.Fatalf("expected current session to be marked")
+	}
+}
+
+func TestRevokeActorSessionRejectsOtherActorSession(t *testing.T) {
+	service := NewService(NewInMemoryRepository())
+	if err := service.SeedCredentials(
+		context.Background(),
+		"admin:admin@redecolmeia.dev:admin-pass,contributor:contributor@redecolmeia.dev:contributor-pass",
+	); err != nil {
+		t.Fatalf("expected nil error while seeding credentials, got %v", err)
+	}
+
+	targetSessionID, _, err := service.Login(context.Background(), "contributor@redecolmeia.dev", "contributor-pass")
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	_, actor, err := service.Login(context.Background(), "admin@redecolmeia.dev", "admin-pass")
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+
+	err = service.RevokeActorSession(context.Background(), actor, targetSessionID)
+	if err != ErrSessionForbidden {
+		t.Fatalf("expected error %v, got %v", ErrSessionForbidden, err)
+	}
+}

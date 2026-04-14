@@ -31,6 +31,8 @@ func NewRouter(usersHandler http.Handler, authHandler *auth.Handler, authService
 	mux.Handle("/api/v1/auth/logout", requireAnyAuthenticated(http.HandlerFunc(authHandler.Logout)))
 	mux.Handle("/api/v1/auth/logout-all", requireAnyAuthenticated(http.HandlerFunc(authHandler.LogoutAll)))
 	mux.Handle("/api/v1/auth/session/rotate", requireAnyAuthenticated(http.HandlerFunc(authHandler.RotateSession)))
+	mux.Handle("/api/v1/auth/sessions", requireAnyAuthenticated(http.HandlerFunc(authHandler.Sessions)))
+	mux.Handle("/api/v1/auth/sessions/revoke", requireAnyAuthenticated(http.HandlerFunc(authHandler.RevokeSessionByID)))
 	mux.Handle("/api/v1/auth/whoami", requireAnyAuthenticated(http.HandlerFunc(authHandler.WhoAmI)))
 	mux.Handle("/api/v1/users/ping", requireOperator(usersHandler))
 	return mux

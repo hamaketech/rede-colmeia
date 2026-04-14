@@ -31,6 +31,10 @@ type confirmResetRequest struct {
 	NewPassword string `json:"newPassword"`
 }
 
+type revokeSessionRequest struct {
+	SessionID string `json:"sessionId"`
+}
+
 func NewHandler(service *Service, exposeResetToken bool) *Handler {
 	return &Handler{
 		service:          service,
@@ -221,6 +225,84 @@ func (h *Handler) RotateSession(w http.ResponseWriter, r *http.Request) {
 
 	writeSuccess(w, http.StatusOK, map[string]string{
 		"message": "session rotated",
+	})
+}
+
+func (h *Handler) Sessions(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	actor, ok := ActorFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
+		return
+	}
+	currentCookie, err := r.Cookie(SessionCookieName)
+	currentSessionID := ""
+	if err == nil {
+		currentSessionID = currentCookie.Value
+	}
+
+	sessions, err := h.service.ListActorSessions(r.Context(), actor, currentSessionID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "internal_error", "could not list sessions", nil)
+		return
+	}
+
+	writeSuccess(w, http.StatusOK, map[string]any{
+		"sessions": sessions,
+	})
+}
+
+func (h *Handler) RevokeSessionByID(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	actor, ok := ActorFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
+		return
+	}
+
+	var payload revokeSessionRequest
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		writeError(w, http.StatusBadRequest, "validation_error", "invalid revoke session payload", nil)
+		return
+	}
+	if payload.SessionID == "" {
+		writeError(w, http.StatusBadRequest, "validation_error", "sessionId is required", nil)
+		return
+	}
+
+	err := h.service.RevokeActorSession(r.Context(), actor, payload.SessionID)
+	if err != nil {
+		switch {
+		case errors.Is(err, ErrSessionNotFound):
+			writeError(w, http.StatusNotFound, "not_found", "session not found", nil)
+		case errors.Is(err, ErrSessionForbidden):
+			writeError(w, http.StatusForbidden, "forbidden", "session does not belong to actor", nil)
+		default:
+			writeError(w, http.StatusInternalServerError, "internal_error", "could not revoke session", nil)
+		}
+		return
+	}
+
+	currentCookie, cookieErr := r.Cookie(SessionCookieName)
+	if cookieErr == nil && currentCookie.Value == payload.SessionID {
+		http.SetCookie(w, &http.Cookie{
+			Name:     SessionCookieName,
+			Value:    "",
+			Path:     "/",
+			HttpOnly: true,
+			SameSite: http.SameSiteLaxMode,
+			MaxAge:   -1,
+		})
+	}
+
+	writeSuccess(w, http.StatusOK, map[string]string{
+		"message": "session revoked",
 	})
 }
 
