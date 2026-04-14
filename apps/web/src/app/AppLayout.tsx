@@ -15,7 +15,7 @@ export function AppLayout() {
         </div>
         <nav className="app-nav" aria-label="Primary navigation">
           <NavLink className={linkClassName} to="/">
-            Dashboard
+            Home
           </NavLink>
           <NavLink className={linkClassName} to="/partners">
             Partners
