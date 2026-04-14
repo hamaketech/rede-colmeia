@@ -2,10 +2,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useLanguage } from "@/lib/i18n/LanguageProvider";
+import { useLandingVariant } from "@/lib/landing/useLandingVariant";
 import { Link } from "react-router-dom";
 
 export function LandingPage() {
   const { t } = useLanguage();
+  const { variant, abTestEnabled } = useLandingVariant();
   const impactStats = [
     { label: t("landing.statContributors"), value: "1,240+" },
     { label: t("landing.statPartners"), value: "38" },
@@ -28,10 +30,15 @@ export function LandingPage() {
   ];
 
   return (
-    <section className="landing">
+    <section className={`landing${variant === "campaign-dark" ? " landing-campaign-dark" : ""}`}>
       <div className="landing-hero surface-card">
         <div className="landing-kicker-row">
           <Badge>{t("landing.badge")}</Badge>
+          {abTestEnabled ? (
+            <Badge variant="warning">
+              {variant === "campaign-dark" ? "Campaign B" : "Campaign A"}
+            </Badge>
+          ) : null}
           <span className="landing-kicker">{t("landing.kicker")}</span>
         </div>
 

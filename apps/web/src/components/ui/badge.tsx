@@ -18,6 +18,18 @@ const badgeVariants = cva("ui-badge", {
 
 type BadgeProps = HTMLAttributes<HTMLSpanElement> & VariantProps<typeof badgeVariants>;
 
-export function Badge({ className, variant, ...props }: BadgeProps) {
-  return <span className={cn(badgeVariants({ variant }), className)} {...props} />;
+export function Badge({ className, variant, children, ...props }: BadgeProps) {
+  const statusSymbol =
+    variant === "success" ? "✓" : variant === "warning" ? "!" : variant === "error" ? "✕" : null;
+
+  return (
+    <span className={cn(badgeVariants({ variant }), statusSymbol ? "ui-badge-with-symbol" : "", className)} {...props}>
+      {statusSymbol ? (
+        <span className="ui-badge-symbol" aria-hidden="true">
+          {statusSymbol}
+        </span>
+      ) : null}
+      {children}
+    </span>
+  );
 }

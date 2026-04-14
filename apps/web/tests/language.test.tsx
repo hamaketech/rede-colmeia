@@ -2,13 +2,16 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { AppLayout } from "../src/app/AppLayout";
 import { LanguageProvider } from "../src/lib/i18n/LanguageProvider";
+import { VisualModeProvider } from "../src/lib/theme/VisualModeProvider";
 
 function renderLayout() {
   return render(
     <LanguageProvider>
-      <MemoryRouter>
-        <AppLayout />
-      </MemoryRouter>
+      <VisualModeProvider>
+        <MemoryRouter>
+          <AppLayout />
+        </MemoryRouter>
+      </VisualModeProvider>
     </LanguageProvider>
   );
 }
