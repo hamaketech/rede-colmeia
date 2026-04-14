@@ -1,1 +1,19 @@
-docs/
+.DS_Store
+*.log
+
+# Environment files
+.env
+.env.*
+
+# Node
+node_modules/
+dist/
+coverage/
+
+# Go
+bin/
+*.test
+
+# IDE
+.idea/
+.vscode/
