@@ -101,6 +101,53 @@ select:focus-visible {
   gap: var(--space-4);
 }
 
+.language-switch {
+  display: grid;
+  gap: var(--space-1);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.language-flag-group {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-alt);
+}
+
+.language-flag-button {
+  min-height: 44px;
+  min-width: 44px;
+  border-radius: var(--radius-pill);
+  border: 1px solid transparent;
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color var(--duration-base) var(--ease-standard),
+    border-color var(--duration-base) var(--ease-standard);
+}
+
+.language-flag-button:hover {
+  background: #ead8b6;
+}
+
+.language-flag-button-active {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+}
+
+.language-flag-icon {
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
 .brand-title {
   margin: 0;
   font-size: 1.5rem;
@@ -499,6 +546,16 @@ select:focus-visible {
   .app-header {
     border-radius: var(--radius-md);
     padding: var(--space-3);
+  }
+
+  .app-header-top {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .language-flag-group {
+    width: 100%;
+    justify-content: space-between;
   }
 
   .app-nav {

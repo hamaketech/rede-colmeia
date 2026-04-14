@@ -1,8 +1,12 @@
+import { useLanguage } from "@/lib/i18n/LanguageProvider";
+
 export function TransparencyPage() {
+  const { t } = useLanguage();
+
   return (
-    <section>
-      <h2>Transparency</h2>
-      <p>Transparency feature scaffold ready.</p>
+    <section className="page">
+      <h2>{t("transparency.title")}</h2>
+      <p>{t("transparency.subtitle")}</p>
     </section>
   );
 }

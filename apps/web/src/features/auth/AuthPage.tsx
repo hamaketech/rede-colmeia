@@ -1,8 +1,12 @@
+import { useLanguage } from "@/lib/i18n/LanguageProvider";
+
 export function AuthPage() {
+  const { t } = useLanguage();
+
   return (
-    <section>
-      <h2>Auth</h2>
-      <p>Authentication flow scaffold ready.</p>
+    <section className="page">
+      <h2>{t("auth.title")}</h2>
+      <p>{t("auth.subtitle")}</p>
     </section>
   );
 }

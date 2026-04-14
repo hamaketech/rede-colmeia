@@ -2,29 +2,31 @@ import { useHealth } from "../../hooks/useHealth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useLanguage } from "@/lib/i18n/LanguageProvider";
 import { toast } from "sonner";
 
 export function DashboardPage() {
+  const { t } = useLanguage();
   const { status, error } = useHealth();
   const statusVariant = status === "ok" ? "success" : "error";
 
   return (
     <section className="page">
-      <h2>Dashboard</h2>
+      <h2>{t("dashboard.title")}</h2>
       <Card>
         <CardHeader>
-          <CardTitle>Platform health</CardTitle>
+          <CardTitle>{t("dashboard.healthTitle")}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="meta-row">
-            <strong>API status</strong>
+            <strong>{t("dashboard.apiStatus")}</strong>
             <Badge variant={statusVariant}>{status}</Badge>
             <Button
               variant="secondary"
-              onClick={() => toast.success("Health check flow is connected.")}
+              onClick={() => toast.success(t("dashboard.feedbackToast"))}
               type="button"
             >
-              Test feedback
+              {t("dashboard.feedback")}
             </Button>
           </div>
         </CardContent>
@@ -32,7 +34,9 @@ export function DashboardPage() {
       {error ? (
         <Card>
           <CardContent>
-          <p className="error-text">Health check error: {error}</p>
+            <p className="error-text">
+              {t("dashboard.errorPrefix")}: {error}
+            </p>
           </CardContent>
         </Card>
       ) : null}
