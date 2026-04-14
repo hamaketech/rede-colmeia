@@ -131,6 +131,18 @@ a {
   color: inherit;
 }
 
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 a:focus-visible,
 button:focus-visible,
 input:focus-visible,
@@ -153,175 +165,86 @@ select:focus-visible {
   margin-bottom: var(--space-6);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  background: var(--color-surface);
+  background:
+    radial-gradient(circle at top right, color-mix(in srgb, var(--color-primary) 18%, transparent), transparent 52%),
+    linear-gradient(180deg, color-mix(in srgb, var(--color-surface) 92%, white) 0%, var(--color-surface) 100%);
   box-shadow: var(--shadow-sm);
-  padding: var(--space-4);
+  padding: var(--space-5, 20px);
+  backdrop-filter: blur(8px);
 }
 
-.app-header-top {
+.app-header-main {
   display: flex;
   justify-content: space-between;
-  align-items: baseline;
+  align-items: center;
   gap: var(--space-4);
+  margin-bottom: var(--space-3);
 }
 
 .app-brand-block {
   display: grid;
-}
-
-.app-controls-stack {
-  display: grid;
-  gap: var(--space-2);
-}
-
-.language-switch {
-  display: grid;
   gap: var(--space-1);
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
 }
 
-.language-flag-group {
+.utility-toolbar {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-1);
-  border: 1px solid var(--color-border);
+  gap: 4px;
+  padding: 4px;
   border-radius: var(--radius-pill);
-  background: var(--color-surface-alt);
+  border: 1px solid color-mix(in srgb, var(--color-border) 85%, transparent);
+  background: color-mix(in srgb, var(--color-surface-alt) 40%, transparent);
 }
 
-.language-flag-button {
-  min-height: 44px;
-  min-width: 44px;
+.utility-select {
+  min-height: 36px;
+  min-width: 52px;
+  padding: 0 28px 0 10px;
   border-radius: var(--radius-pill);
-  border: 1px solid transparent;
-  background: transparent;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: background-color var(--duration-base) var(--ease-standard),
-    border-color var(--duration-base) var(--ease-standard);
-}
-
-.language-flag-button:hover {
-  background: var(--color-surface);
-}
-
-.language-flag-button-active {
-  border-color: var(--color-primary);
-  background: var(--color-primary);
-}
-
-.language-flag-icon {
-  font-size: 1.25rem;
+  border: 1px solid color-mix(in srgb, var(--color-border) 85%, transparent);
+  background-color: var(--color-surface);
+  color: var(--color-fg);
+  font-size: 0.95rem;
   line-height: 1;
 }
 
-.visual-mode-switch {
-  display: grid;
-  gap: var(--space-1);
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+.utility-select option {
+  font-size: 1rem;
 }
 
-.visual-main-group {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-1);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-pill);
-  background: var(--color-surface-alt);
-}
-
-.visual-mode-main-button {
-  min-height: 40px;
-  min-width: 84px;
-  border-radius: var(--radius-pill);
-  border: 1px solid transparent;
-  background: transparent;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  font-size: 0.85rem;
-  font-weight: 700;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-  transition: background-color var(--duration-base) var(--ease-standard),
-    border-color var(--duration-base) var(--ease-standard);
-}
-
-.visual-mode-main-button:hover {
-  background: var(--color-surface);
-}
-
-.visual-mode-main-button-active {
-  border-color: var(--color-primary);
-  background: var(--color-primary);
-  color: var(--color-primary-fg);
-}
-
-.visual-mode-compact-group {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  padding: var(--space-1);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-pill);
-  background: var(--color-surface-alt);
-}
-
-.visual-mode-compact-button {
-  min-height: 32px;
-  min-width: 32px;
-  border-radius: var(--radius-pill);
-  border: 1px solid transparent;
-  background: transparent;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  font-size: 0.75rem;
-  font-weight: 700;
-  transition: background-color var(--duration-base) var(--ease-standard),
-    border-color var(--duration-base) var(--ease-standard);
-}
-
-.visual-mode-compact-button:hover {
-  background: var(--color-surface);
-}
-
-.visual-mode-compact-button-active {
-  border-color: var(--color-primary);
-  background: var(--color-primary);
-  color: var(--color-primary-fg);
+.utility-select-icon {
+  min-width: 46px;
+  font-size: 1rem;
+  text-align: center;
+  text-align-last: center;
+  padding-left: 8px;
 }
 
 .brand-title {
   margin: 0;
-  font-size: 1.5rem;
-  font-weight: 700;
-  line-height: 1.25;
+  font-size: clamp(1.5rem, 2.5vw, 1.9rem);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
 }
 
 .brand-subtitle {
-  margin: var(--space-1) 0 0;
+  margin: 0;
   color: color-mix(in srgb, var(--color-fg) 72%, transparent);
-  font-size: 0.875rem;
+  font-size: 0.92rem;
+  max-width: 32ch;
+}
+
+.app-nav-shell {
+  border-top: 1px solid color-mix(in srgb, var(--color-border) 72%, transparent);
+  padding-top: var(--space-2);
 }
 
 .app-nav {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
-  margin-top: var(--space-4);
+  align-items: center;
 }
 
 .nav-link {
@@ -337,17 +260,21 @@ select:focus-visible {
   text-decoration: none;
   font-size: 0.95rem;
   font-weight: 600;
+  color: var(--color-fg);
   transition: background-color var(--duration-base) var(--ease-standard),
     transform var(--duration-base) var(--ease-standard);
 }
 
 .nav-link:hover {
   background-color: var(--color-surface);
+  transform: translateY(-1px);
 }
 
 .nav-link-active {
   background-color: var(--color-primary);
   border-color: var(--color-primary);
+  color: var(--color-primary-fg);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--color-primary) 32%, transparent);
 }
 
 .page {
@@ -749,7 +676,7 @@ select:focus-visible {
 @media (max-width: 768px) {
   .layout {
     padding: var(--space-4);
-    padding-bottom: var(--space-10);
+    padding-bottom: var(--space-6);
   }
 
   .app-header {
@@ -757,44 +684,60 @@ select:focus-visible {
     padding: var(--space-3);
   }
 
-  .app-header-top {
+  .app-header-main {
     align-items: stretch;
     flex-direction: column;
+    margin-bottom: var(--space-2);
   }
 
-  .app-controls-stack {
-    grid-template-columns: 1fr;
-  }
-
-  .language-flag-group {
+  .utility-toolbar {
     width: 100%;
+    max-width: 100%;
     justify-content: space-between;
+    padding: 4px;
+    border-radius: var(--radius-md);
+    gap: var(--space-1);
+    overflow-x: visible;
   }
 
-  .visual-main-group {
-    width: 100%;
-    justify-content: space-between;
-  }
-
-  .visual-mode-main-button {
-    flex: 1 1 0;
+  .utility-select {
+    min-height: 44px;
     min-width: 0;
+    width: 100%;
+    flex: 1 1 0;
+    font-size: 1rem;
+  }
+
+  .utility-select-icon {
+    min-width: 0;
+    text-align: center;
+  }
+
+  .app-nav-shell {
+    padding-top: var(--space-2);
   }
 
   .app-nav {
-    position: sticky;
-    bottom: var(--space-2);
-    background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-pill);
-    padding: var(--space-2);
-    justify-content: space-between;
+    position: static;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-2);
+    background: transparent;
+    border: 0;
+    padding: 0;
   }
 
   .nav-link {
-    flex: 1 1 auto;
-    padding: 0 var(--space-2);
-    font-size: 0.82rem;
+    min-height: 48px;
+    width: 100%;
+    padding: 0 var(--space-3);
+    font-size: 0.9rem;
+    border-radius: var(--radius-md);
+    justify-content: center;
+  }
+
+  .nav-link:hover {
+    transform: none;
   }
 
   .landing-hero {

@@ -24,20 +24,20 @@ describe("Language switch", () => {
   it("defaults to Portuguese and keeps priority order", () => {
     renderLayout();
 
-    const ptButton = screen.getByRole("button", { name: "Portugues" });
-    const esButton = screen.getByRole("button", { name: "Espanhol" });
-    const enButton = screen.getByRole("button", { name: "Ingles" });
+    const languageSelect = screen.getByRole("combobox", { name: "Idioma" }) as HTMLSelectElement;
+    const options = Array.from(languageSelect.options).map((option) => option.value);
 
-    expect(ptButton).toHaveAttribute("aria-pressed", "true");
-    expect(esButton).toHaveAttribute("aria-pressed", "false");
-    expect(enButton).toHaveAttribute("aria-pressed", "false");
+    expect(languageSelect.value).toBe("pt");
+    expect(options).toEqual(["pt", "es", "en"]);
     expect(screen.getByText("Inicio")).toBeInTheDocument();
   });
 
   it("switches language and persists selection", async () => {
     renderLayout();
 
-    fireEvent.click(screen.getByRole("button", { name: "Espanhol" }));
+    fireEvent.change(screen.getByRole("combobox", { name: "Idioma" }), {
+      target: { value: "es" }
+    });
 
     expect(screen.getByText("Aliados")).toBeInTheDocument();
     expect(window.localStorage.getItem("rede-colmeia-language")).toBe("es");
@@ -52,9 +52,8 @@ describe("Language switch", () => {
       expect(screen.getByText("Home")).toBeInTheDocument();
     });
 
-    expect(screen.getByRole("button", { name: "Ingles" })).toHaveAttribute(
-      "aria-pressed",
-      "true"
+    expect((screen.getByRole("combobox", { name: "Language" }) as HTMLSelectElement).value).toBe(
+      "en"
     );
     expect(document.documentElement.lang).toBe("en");
   });

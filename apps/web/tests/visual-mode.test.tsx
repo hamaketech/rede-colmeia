@@ -29,7 +29,9 @@ describe("Visual mode switch", () => {
 
   it("switches to dark mode and persists mode", () => {
     renderLayout();
-    fireEvent.click(screen.getByRole("button", { name: "Dark" }));
+    fireEvent.change(screen.getByRole("combobox", { name: "Visual" }), {
+      target: { value: "dark" }
+    });
 
     expect(window.localStorage.getItem("rede-colmeia-theme-mode")).toBe("dark");
     expect(document.body.classList.contains("theme-dark")).toBe(true);
@@ -37,7 +39,9 @@ describe("Visual mode switch", () => {
 
   it("switches to protanopia filter", () => {
     renderLayout();
-    fireEvent.click(screen.getByRole("button", { name: "Protanopia" }));
+    fireEvent.change(screen.getByRole("combobox", { name: "Filtro CVD" }), {
+      target: { value: "protanopia" }
+    });
 
     expect(window.localStorage.getItem("rede-colmeia-cvd-mode")).toBe("protanopia");
     expect(document.body.classList.contains("cvd-protanopia")).toBe(true);
@@ -45,7 +49,9 @@ describe("Visual mode switch", () => {
 
   it("switches to deuteranopia filter", () => {
     renderLayout();
-    fireEvent.click(screen.getByRole("button", { name: "Deuteranopia" }));
+    fireEvent.change(screen.getByRole("combobox", { name: "Filtro CVD" }), {
+      target: { value: "deuteranopia" }
+    });
 
     expect(window.localStorage.getItem("rede-colmeia-cvd-mode")).toBe("deuteranopia");
     expect(document.body.classList.contains("cvd-deuteranopia")).toBe(true);
@@ -53,7 +59,9 @@ describe("Visual mode switch", () => {
 
   it("switches to tritanopia filter", () => {
     renderLayout();
-    fireEvent.click(screen.getByRole("button", { name: "Tritanopia" }));
+    fireEvent.change(screen.getByRole("combobox", { name: "Filtro CVD" }), {
+      target: { value: "tritanopia" }
+    });
 
     expect(window.localStorage.getItem("rede-colmeia-cvd-mode")).toBe("tritanopia");
     expect(document.body.classList.contains("cvd-tritanopia")).toBe(true);
@@ -61,8 +69,13 @@ describe("Visual mode switch", () => {
 
   it("can turn off color vision filter", () => {
     renderLayout();
-    fireEvent.click(screen.getByRole("button", { name: "Protanopia" }));
-    fireEvent.click(screen.getByRole("button", { name: "No CVD filter" }));
+    const cvdSelect = screen.getByRole("combobox", { name: "Filtro CVD" });
+    fireEvent.change(cvdSelect, {
+      target: { value: "protanopia" }
+    });
+    fireEvent.change(cvdSelect, {
+      target: { value: "none" }
+    });
 
     expect(window.localStorage.getItem("rede-colmeia-cvd-mode")).toBe("none");
     expect(document.body.classList.contains("cvd-protanopia")).toBe(false);

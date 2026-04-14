@@ -24,6 +24,8 @@ const translations: Record<LanguageCode, Record<string, string>> = {
     "nav.transparency": "Transparencia",
     "nav.auth": "Entrar",
     "nav.languageLabel": "Idioma",
+    "nav.visualLabel": "Visual",
+    "nav.cvdLabel": "Filtro CVD",
 
     "landing.badge": "Ajuda mutua descentralizada",
     "landing.kicker": "Infraestrutura movida pela comunidade",
@@ -84,6 +86,8 @@ const translations: Record<LanguageCode, Record<string, string>> = {
     "nav.transparency": "Transparencia",
     "nav.auth": "Acceder",
     "nav.languageLabel": "Idioma",
+    "nav.visualLabel": "Visual",
+    "nav.cvdLabel": "Filtro CVD",
 
     "landing.badge": "Ayuda mutua descentralizada",
     "landing.kicker": "Infraestructura impulsada por la comunidad",
@@ -144,6 +148,8 @@ const translations: Record<LanguageCode, Record<string, string>> = {
     "nav.transparency": "Transparency",
     "nav.auth": "Auth",
     "nav.languageLabel": "Language",
+    "nav.visualLabel": "Visual",
+    "nav.cvdLabel": "CVD Filter",
 
     "landing.badge": "Decentralized mutual aid",
     "landing.kicker": "Community powered infrastructure",
