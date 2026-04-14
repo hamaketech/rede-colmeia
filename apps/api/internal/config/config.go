@@ -3,14 +3,18 @@ package config
 import "os"
 
 type Config struct {
-	Port      string
-	SentryDSN string
+	Port        string
+	SentryDSN   string
+	DatabaseURL string
+	AuthTokens  string
 }
 
 func Load() Config {
 	return Config{
-		Port:      getEnv("PORT", "8080"),
-		SentryDSN: os.Getenv("SENTRY_DSN"),
+		Port:        getEnv("PORT", "8080"),
+		SentryDSN:   os.Getenv("SENTRY_DSN"),
+		DatabaseURL: os.Getenv("DATABASE_URL"),
+		AuthTokens:  os.Getenv("AUTH_TOKENS"),
 	}
 }
 

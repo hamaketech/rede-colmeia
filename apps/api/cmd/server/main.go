@@ -14,6 +14,7 @@ import (
 	"github.com/rede-colmeia/apps/api/internal/database"
 	apphttp "github.com/rede-colmeia/apps/api/internal/http"
 	"github.com/rede-colmeia/apps/api/internal/middleware"
+	"github.com/rede-colmeia/apps/api/internal/modules/auth"
 	"github.com/rede-colmeia/apps/api/internal/modules/users"
 	"github.com/rede-colmeia/apps/api/internal/observability"
 )
@@ -27,11 +28,28 @@ func main() {
 		logger.Printf("migration warning: %v", err)
 	}
 
-	usersRepo := users.NewInMemoryRepository()
+	db, err := database.Open(cfg.DatabaseURL)
+	if err != nil {
+		logger.Fatalf("database setup failed: %v", err)
+	}
+	if db != nil {
+		defer db.Close()
+	}
+
+	var usersRepo users.Repository
+	if db != nil {
+		usersRepo = users.NewSQLRepository(db)
+		logger.Printf("users repository adapter: sqlite")
+	} else {
+		usersRepo = users.NewInMemoryRepository()
+		logger.Printf("users repository adapter: in-memory fallback")
+	}
+
+	authService := auth.NewService(cfg.AuthTokens)
 	usersService := users.NewService(usersRepo)
 	usersHandler := users.NewHandler(usersService)
 
-	router := apphttp.NewRouter(usersHandler)
+	router := apphttp.NewRouter(usersHandler, authService)
 	handler := middleware.WithRecovery(logger, middleware.WithRequestID(router))
 
 	server := &http.Server{
