@@ -5,23 +5,32 @@ import {
   getPartnersWorkflowList,
   type BeneficiaryWorkflowItem,
   type DistributionWorkflowItem,
-  type PartnerWorkflowItem
+  type PartnerWorkflowItem,
+  type WorkflowListParams
 } from "@/lib/api/ops";
 
-type WorkflowListState<T> = {
+export type WorkflowListState<T> = {
   loading: boolean;
   error: string | null;
   items: T[];
 };
 
-export function usePartnersWorkflowList() {
+function useWorkflowList<T>(
+  params: WorkflowListParams,
+  fetcher: (params: WorkflowListParams) => Promise<{ items: T[] }>
+): WorkflowListState<T> {
+  const page = params.page ?? 1;
+  const pageSize = params.pageSize ?? 20;
+  const status = params.status ?? "";
+  const region = params.region ?? "";
+  const sort = params.sort ?? "";
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [items, setItems] = useState<PartnerWorkflowItem[]>([]);
+  const [items, setItems] = useState<T[]>([]);
 
   useEffect(() => {
     let cancelled = false;
-    getPartnersWorkflowList()
+    fetcher({ page, pageSize, status, region, sort })
       .then((payload) => {
         if (cancelled) {
           return;
@@ -40,69 +49,19 @@ export function usePartnersWorkflowList() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [page, pageSize, status, region, sort, fetcher]);
 
-  return { loading, error, items } satisfies WorkflowListState<PartnerWorkflowItem>;
+  return { loading, error, items };
 }
 
-export function useBeneficiariesWorkflowList() {
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [items, setItems] = useState<BeneficiaryWorkflowItem[]>([]);
-
-  useEffect(() => {
-    let cancelled = false;
-    getBeneficiariesWorkflowList()
-      .then((payload) => {
-        if (cancelled) {
-          return;
-        }
-        setItems(payload.items);
-        setError(null);
-        setLoading(false);
-      })
-      .catch((err: unknown) => {
-        if (cancelled) {
-          return;
-        }
-        setError(err instanceof Error ? err.message : "could not load workflow list");
-        setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  return { loading, error, items } satisfies WorkflowListState<BeneficiaryWorkflowItem>;
+export function usePartnersWorkflowList(params: WorkflowListParams) {
+  return useWorkflowList<PartnerWorkflowItem>(params, getPartnersWorkflowList);
 }
 
-export function useDistributionsWorkflowList() {
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [items, setItems] = useState<DistributionWorkflowItem[]>([]);
+export function useBeneficiariesWorkflowList(params: WorkflowListParams) {
+  return useWorkflowList<BeneficiaryWorkflowItem>(params, getBeneficiariesWorkflowList);
+}
 
-  useEffect(() => {
-    let cancelled = false;
-    getDistributionsWorkflowList()
-      .then((payload) => {
-        if (cancelled) {
-          return;
-        }
-        setItems(payload.items);
-        setError(null);
-        setLoading(false);
-      })
-      .catch((err: unknown) => {
-        if (cancelled) {
-          return;
-        }
-        setError(err instanceof Error ? err.message : "could not load workflow list");
-        setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  return { loading, error, items } satisfies WorkflowListState<DistributionWorkflowItem>;
+export function useDistributionsWorkflowList(params: WorkflowListParams) {
+  return useWorkflowList<DistributionWorkflowItem>(params, getDistributionsWorkflowList);
 }

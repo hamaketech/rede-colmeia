@@ -11,9 +11,9 @@ const useBeneficiariesWorkflowListMock = vi.fn();
 const useDistributionsWorkflowListMock = vi.fn();
 
 vi.mock("../src/hooks/useWorkflowLists", () => ({
-  usePartnersWorkflowList: () => usePartnersWorkflowListMock(),
-  useBeneficiariesWorkflowList: () => useBeneficiariesWorkflowListMock(),
-  useDistributionsWorkflowList: () => useDistributionsWorkflowListMock()
+  usePartnersWorkflowList: (...args: unknown[]) => usePartnersWorkflowListMock(...args),
+  useBeneficiariesWorkflowList: (...args: unknown[]) => useBeneficiariesWorkflowListMock(...args),
+  useDistributionsWorkflowList: (...args: unknown[]) => useDistributionsWorkflowListMock(...args)
 }));
 
 describe("Workflow drilldown pages", () => {
@@ -41,13 +41,20 @@ describe("Workflow drilldown pages", () => {
   it("renders partners drilldown list", () => {
     render(
       <LanguageProvider>
-        <MemoryRouter>
+        <MemoryRouter initialEntries={["/partners?status=active&region=Norte&sort=name_asc&pageSize=10"]}>
           <PartnersDrilldownPage />
         </MemoryRouter>
       </LanguageProvider>
     );
     expect(screen.getByText("Drilldown de parceiros")).toBeInTheDocument();
     expect(screen.getByText("Centro Comunitario Norte")).toBeInTheDocument();
+    expect(usePartnersWorkflowListMock).toHaveBeenCalledWith({
+      page: 1,
+      pageSize: 10,
+      status: "active",
+      region: "Norte",
+      sort: "name_asc"
+    });
   });
 
   it("renders beneficiaries drilldown list", () => {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -57,11 +58,11 @@ type DistributionView struct {
 type Repository interface {
 	EnsureSeedData(context.Context) error
 	GetPartnerSummary(context.Context) (PartnerSummary, error)
-	ListPartners(context.Context, int, int) ([]PartnerView, error)
+	ListPartners(context.Context, ListQuery) ([]PartnerView, error)
 	GetBeneficiarySummary(context.Context) (BeneficiarySummary, error)
-	ListBeneficiaries(context.Context, int, int) ([]BeneficiaryView, error)
+	ListBeneficiaries(context.Context, ListQuery) ([]BeneficiaryView, error)
 	GetDistributionSummary(context.Context) (DistributionSummary, error)
-	ListDistributions(context.Context, int, int) ([]DistributionView, error)
+	ListDistributions(context.Context, ListQuery) ([]DistributionView, error)
 }
 
 type InMemoryRepository struct{}
@@ -76,26 +77,66 @@ func (r *InMemoryRepository) GetPartnerSummary(_ context.Context) (PartnerSummar
 	return PartnerSummary{Active: 3, Pending: 1, Paused: 1, Regions: 2}, nil
 }
 
-func (r *InMemoryRepository) ListPartners(_ context.Context, _ int, _ int) ([]PartnerView, error) {
-	return []PartnerView{
+func (r *InMemoryRepository) ListPartners(_ context.Context, query ListQuery) ([]PartnerView, error) {
+	items := []PartnerView{
 		{ID: "partner-1", Name: "Centro A", Region: "Norte", Status: "active", CapacityMonthlyBaskets: 120},
-	}, nil
+		{ID: "partner-2", Name: "Rede B", Region: "Sul", Status: "pending", CapacityMonthlyBaskets: 80},
+	}
+	filtered := make([]PartnerView, 0, len(items))
+	for _, item := range items {
+		if query.Status != "" && item.Status != query.Status {
+			continue
+		}
+		if query.Region != "" && !strings.Contains(strings.ToLower(item.Region), strings.ToLower(query.Region)) {
+			continue
+		}
+		filtered = append(filtered, item)
+	}
+	return filtered, nil
 }
 
 func (r *InMemoryRepository) GetBeneficiarySummary(_ context.Context) (BeneficiarySummary, error) {
 	return BeneficiarySummary{QuickValidation: 12, Validated: 8, FamilySize1To2: 7, FamilySize3To4: 9, FamilySize5OrMore: 4}, nil
 }
 
-func (r *InMemoryRepository) ListBeneficiaries(_ context.Context, _ int, _ int) ([]BeneficiaryView, error) {
-	return []BeneficiaryView{{ID: "benef-1", Region: "Norte", ValidationLevel: "quick"}}, nil
+func (r *InMemoryRepository) ListBeneficiaries(_ context.Context, query ListQuery) ([]BeneficiaryView, error) {
+	items := []BeneficiaryView{
+		{ID: "benef-1", Region: "Norte", ValidationLevel: "quick"},
+		{ID: "benef-2", Region: "Sul", ValidationLevel: "validated"},
+	}
+	filtered := make([]BeneficiaryView, 0, len(items))
+	for _, item := range items {
+		if query.Status != "" && item.ValidationLevel != query.Status {
+			continue
+		}
+		if query.Region != "" && !strings.Contains(strings.ToLower(item.Region), strings.ToLower(query.Region)) {
+			continue
+		}
+		filtered = append(filtered, item)
+	}
+	return filtered, nil
 }
 
 func (r *InMemoryRepository) GetDistributionSummary(_ context.Context) (DistributionSummary, error) {
 	return DistributionSummary{Planned: 6, InProgress: 4, Confirmed: 10, ConfirmedBaskets: 220}, nil
 }
 
-func (r *InMemoryRepository) ListDistributions(_ context.Context, _ int, _ int) ([]DistributionView, error) {
-	return []DistributionView{{ID: "dist-1", PartnerID: "partner-1", Region: "Norte", Status: "confirmed", Baskets: 22}}, nil
+func (r *InMemoryRepository) ListDistributions(_ context.Context, query ListQuery) ([]DistributionView, error) {
+	items := []DistributionView{
+		{ID: "dist-1", PartnerID: "partner-1", Region: "Norte", Status: "confirmed", Baskets: 22},
+		{ID: "dist-2", PartnerID: "partner-2", Region: "Sul", Status: "planned", Baskets: 30},
+	}
+	filtered := make([]DistributionView, 0, len(items))
+	for _, item := range items {
+		if query.Status != "" && item.Status != query.Status {
+			continue
+		}
+		if query.Region != "" && !strings.Contains(strings.ToLower(item.Region), strings.ToLower(query.Region)) {
+			continue
+		}
+		filtered = append(filtered, item)
+	}
+	return filtered, nil
 }
 
 type SQLRepository struct {
@@ -168,9 +209,25 @@ func (r *SQLRepository) GetPartnerSummary(ctx context.Context) (PartnerSummary, 
 	return PartnerSummary{Active: active, Pending: pending, Paused: paused, Regions: regions}, nil
 }
 
-func (r *SQLRepository) ListPartners(ctx context.Context, limit int, offset int) ([]PartnerView, error) {
-	rows, err := r.db.QueryContext(ctx, `SELECT id, name, COALESCE(region, ''), COALESCE(status, 'active'), COALESCE(capacity, 0)
-		FROM partners ORDER BY created_at DESC LIMIT ? OFFSET ?`, limit, offset)
+func (r *SQLRepository) ListPartners(ctx context.Context, query ListQuery) ([]PartnerView, error) {
+	limit, offset := query.limitOffset()
+	sortClause := "created_at DESC"
+	switch query.Sort {
+	case "oldest":
+		sortClause = "created_at ASC"
+	case "name_asc":
+		sortClause = "name ASC"
+	case "name_desc":
+		sortClause = "name DESC"
+	}
+
+	sqlQuery := `SELECT id, name, COALESCE(region, ''), COALESCE(status, 'active'), COALESCE(capacity, 0)
+		FROM partners
+		WHERE (? = '' OR status = ?)
+		  AND (? = '' OR COALESCE(region, '') LIKE '%' || ? || '%')
+		ORDER BY ` + sortClause + `
+		LIMIT ? OFFSET ?`
+	rows, err := r.db.QueryContext(ctx, sqlQuery, query.Status, query.Status, query.Region, query.Region, limit, offset)
 	if err != nil {
 		return nil, fmt.Errorf("list partners: %w", err)
 	}
@@ -206,8 +263,19 @@ func (r *SQLRepository) GetBeneficiarySummary(ctx context.Context) (BeneficiaryS
 	}, nil
 }
 
-func (r *SQLRepository) ListBeneficiaries(ctx context.Context, limit int, offset int) ([]BeneficiaryView, error) {
-	rows, err := r.db.QueryContext(ctx, `SELECT
+func (r *SQLRepository) ListBeneficiaries(ctx context.Context, query ListQuery) ([]BeneficiaryView, error) {
+	limit, offset := query.limitOffset()
+	sortClause := "b.created_at DESC"
+	switch query.Sort {
+	case "oldest":
+		sortClause = "b.created_at ASC"
+	case "region_asc":
+		sortClause = "b.region ASC"
+	case "region_desc":
+		sortClause = "b.region DESC"
+	}
+
+	sqlQuery := `SELECT
 		b.id,
 		COALESCE(b.region, ''),
 		COALESCE(b.status, 'quick'),
@@ -218,8 +286,11 @@ func (r *SQLRepository) ListBeneficiaries(ctx context.Context, limit int, offset
 			WHERE di.beneficiary_id = b.id
 		) as last_delivery_at
 		FROM beneficiaries b
-		ORDER BY b.created_at DESC
-		LIMIT ? OFFSET ?`, limit, offset)
+		WHERE (? = '' OR b.status = ?)
+		  AND (? = '' OR COALESCE(b.region, '') LIKE '%' || ? || '%')
+		ORDER BY ` + sortClause + `
+		LIMIT ? OFFSET ?`
+	rows, err := r.db.QueryContext(ctx, sqlQuery, query.Status, query.Status, query.Region, query.Region, limit, offset)
 	if err != nil {
 		return nil, fmt.Errorf("list beneficiaries: %w", err)
 	}
@@ -255,8 +326,19 @@ func (r *SQLRepository) GetDistributionSummary(ctx context.Context) (Distributio
 	return DistributionSummary{Planned: planned, InProgress: inProgress, Confirmed: confirmed, ConfirmedBaskets: confirmedBaskets}, nil
 }
 
-func (r *SQLRepository) ListDistributions(ctx context.Context, limit int, offset int) ([]DistributionView, error) {
-	rows, err := r.db.QueryContext(ctx, `SELECT
+func (r *SQLRepository) ListDistributions(ctx context.Context, query ListQuery) ([]DistributionView, error) {
+	limit, offset := query.limitOffset()
+	sortClause := "d.created_at DESC"
+	switch query.Sort {
+	case "oldest":
+		sortClause = "d.created_at ASC"
+	case "baskets_desc":
+		sortClause = "d.total_baskets DESC"
+	case "baskets_asc":
+		sortClause = "d.total_baskets ASC"
+	}
+
+	sqlQuery := `SELECT
 		d.id,
 		COALESCE(d.partner_id, ''),
 		COALESCE(p.region, ''),
@@ -265,8 +347,11 @@ func (r *SQLRepository) ListDistributions(ctx context.Context, limit int, offset
 		d.created_at
 		FROM distributions d
 		LEFT JOIN partners p ON p.id = d.partner_id
-		ORDER BY d.created_at DESC
-		LIMIT ? OFFSET ?`, limit, offset)
+		WHERE (? = '' OR d.status = ?)
+		  AND (? = '' OR COALESCE(p.region, '') LIKE '%' || ? || '%')
+		ORDER BY ` + sortClause + `
+		LIMIT ? OFFSET ?`
+	rows, err := r.db.QueryContext(ctx, sqlQuery, query.Status, query.Status, query.Region, query.Region, limit, offset)
 	if err != nil {
 		return nil, fmt.Errorf("list distributions: %w", err)
 	}

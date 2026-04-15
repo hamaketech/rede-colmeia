@@ -117,6 +117,17 @@ type DistributionWorkflowListResponse = {
   items: DistributionWorkflowItem[];
   page: number;
   pageSize: number;
+  status?: string;
+  region?: string;
+  sort?: string;
+};
+
+export type WorkflowListParams = {
+  page?: number;
+  pageSize?: number;
+  status?: string;
+  region?: string;
+  sort?: string;
 };
 
 export function getTransparencySummary() {
@@ -143,14 +154,30 @@ export function getDistributionWorkflowSummary() {
   return apiGet<DistributionWorkflowSummaryResponse>("/api/v1/distributions/summary");
 }
 
-export function getPartnersWorkflowList(page = 1, pageSize = 20) {
-  return apiGet<PartnerWorkflowListResponse>(`/api/v1/partners?page=${page}&pageSize=${pageSize}`);
+function toQueryString(params: WorkflowListParams) {
+  const query = new URLSearchParams();
+  query.set("page", String(params.page ?? 1));
+  query.set("pageSize", String(params.pageSize ?? 20));
+  if (params.status) {
+    query.set("status", params.status);
+  }
+  if (params.region) {
+    query.set("region", params.region);
+  }
+  if (params.sort) {
+    query.set("sort", params.sort);
+  }
+  return query.toString();
 }
 
-export function getBeneficiariesWorkflowList(page = 1, pageSize = 20) {
-  return apiGet<BeneficiaryWorkflowListResponse>(`/api/v1/beneficiaries?page=${page}&pageSize=${pageSize}`);
+export function getPartnersWorkflowList(params: WorkflowListParams = {}) {
+  return apiGet<PartnerWorkflowListResponse>(`/api/v1/partners?${toQueryString(params)}`);
 }
 
-export function getDistributionsWorkflowList(page = 1, pageSize = 20) {
-  return apiGet<DistributionWorkflowListResponse>(`/api/v1/distributions?page=${page}&pageSize=${pageSize}`);
+export function getBeneficiariesWorkflowList(params: WorkflowListParams = {}) {
+  return apiGet<BeneficiaryWorkflowListResponse>(`/api/v1/beneficiaries?${toQueryString(params)}`);
+}
+
+export function getDistributionsWorkflowList(params: WorkflowListParams = {}) {
+  return apiGet<DistributionWorkflowListResponse>(`/api/v1/distributions?${toQueryString(params)}`);
 }

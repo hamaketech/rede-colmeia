@@ -32,13 +32,20 @@ func (h *Handler) Partners(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	page, pageSize := readPagination(r)
-	items, err := h.service.Partners(r.Context(), page, pageSize)
+	query := readListQuery(r)
+	items, err := h.service.Partners(r.Context(), query)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "internal_error", "could not load partners")
 		return
 	}
-	writeSuccess(w, http.StatusOK, map[string]any{"items": items, "page": page, "pageSize": pageSize})
+	writeSuccess(w, http.StatusOK, map[string]any{
+		"items":    items,
+		"page":     query.Page,
+		"pageSize": query.PageSize,
+		"status":   query.Status,
+		"region":   query.Region,
+		"sort":     query.Sort,
+	})
 }
 
 func (h *Handler) BeneficiariesSummary(w http.ResponseWriter, r *http.Request) {
@@ -59,13 +66,20 @@ func (h *Handler) Beneficiaries(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	page, pageSize := readPagination(r)
-	items, err := h.service.Beneficiaries(r.Context(), page, pageSize)
+	query := readListQuery(r)
+	items, err := h.service.Beneficiaries(r.Context(), query)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "internal_error", "could not load beneficiaries")
 		return
 	}
-	writeSuccess(w, http.StatusOK, map[string]any{"items": items, "page": page, "pageSize": pageSize})
+	writeSuccess(w, http.StatusOK, map[string]any{
+		"items":    items,
+		"page":     query.Page,
+		"pageSize": query.PageSize,
+		"status":   query.Status,
+		"region":   query.Region,
+		"sort":     query.Sort,
+	})
 }
 
 func (h *Handler) DistributionsSummary(w http.ResponseWriter, r *http.Request) {
@@ -86,25 +100,32 @@ func (h *Handler) Distributions(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	page, pageSize := readPagination(r)
-	items, err := h.service.Distributions(r.Context(), page, pageSize)
+	query := readListQuery(r)
+	items, err := h.service.Distributions(r.Context(), query)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "internal_error", "could not load distributions")
 		return
 	}
-	writeSuccess(w, http.StatusOK, map[string]any{"items": items, "page": page, "pageSize": pageSize})
+	writeSuccess(w, http.StatusOK, map[string]any{
+		"items":    items,
+		"page":     query.Page,
+		"pageSize": query.PageSize,
+		"status":   query.Status,
+		"region":   query.Region,
+		"sort":     query.Sort,
+	})
 }
 
-func readPagination(r *http.Request) (int, int) {
+func readListQuery(r *http.Request) ListQuery {
 	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
 	pageSize, _ := strconv.Atoi(r.URL.Query().Get("pageSize"))
-	if page <= 0 {
-		page = 1
-	}
-	if pageSize <= 0 || pageSize > 100 {
-		pageSize = 20
-	}
-	return page, pageSize
+	return (ListQuery{
+		Page:     page,
+		PageSize: pageSize,
+		Status:   r.URL.Query().Get("status"),
+		Region:   r.URL.Query().Get("region"),
+		Sort:     r.URL.Query().Get("sort"),
+	}).normalize()
 }
 
 func writeSuccess(w http.ResponseWriter, status int, payload any) {
