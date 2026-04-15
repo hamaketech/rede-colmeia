@@ -17,6 +17,7 @@ import (
 	"github.com/rede-colmeia/apps/api/internal/modules/auth"
 	"github.com/rede-colmeia/apps/api/internal/modules/ops"
 	"github.com/rede-colmeia/apps/api/internal/modules/users"
+	"github.com/rede-colmeia/apps/api/internal/modules/workflow"
 	"github.com/rede-colmeia/apps/api/internal/observability"
 )
 
@@ -87,10 +88,24 @@ func main() {
 	}
 	opsHandler := ops.NewHandler(opsService)
 
+	var workflowRepo workflow.Repository
+	if db != nil {
+		workflowRepo = workflow.NewSQLRepository(db)
+		logger.Printf("workflow repository adapter: database")
+	} else {
+		workflowRepo = workflow.NewInMemoryRepository()
+		logger.Printf("workflow repository adapter: in-memory fallback")
+	}
+	workflowService := workflow.NewService(workflowRepo)
+	if err := workflowService.EnsureSeedData(context.Background()); err != nil {
+		logger.Fatalf("seed workflow data failed: %v", err)
+	}
+	workflowHandler := workflow.NewHandler(workflowService)
+
 	usersService := users.NewService(usersRepo)
 	usersHandler := users.NewHandler(usersService)
 
-	router := apphttp.NewRouter(usersHandler, authHandler, opsHandler, authService)
+	router := apphttp.NewRouter(usersHandler, authHandler, opsHandler, workflowHandler, authService)
 	handler := middleware.WithRecovery(
 		logger,
 		middleware.WithCORS(
