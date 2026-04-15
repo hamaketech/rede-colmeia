@@ -7,12 +7,14 @@ import (
 	"github.com/rede-colmeia/apps/api/internal/middleware"
 	"github.com/rede-colmeia/apps/api/internal/modules/auth"
 	"github.com/rede-colmeia/apps/api/internal/modules/ops"
+	"github.com/rede-colmeia/apps/api/internal/modules/workflow"
 )
 
 func NewRouter(
 	usersHandler http.Handler,
 	authHandler *auth.Handler,
 	opsHandler *ops.Handler,
+	workflowHandler *workflow.Handler,
 	authService *auth.Service,
 ) http.Handler {
 	mux := http.NewServeMux()
@@ -46,6 +48,12 @@ func NewRouter(
 		"/api/v1/ops/subscriptions/summary",
 		requireAnyAuthenticated(http.HandlerFunc(opsHandler.SubscriptionsSummary)),
 	)
+	mux.Handle("/api/v1/partners/summary", requireAnyAuthenticated(http.HandlerFunc(workflowHandler.PartnersSummary)))
+	mux.Handle("/api/v1/partners", requireAnyAuthenticated(http.HandlerFunc(workflowHandler.Partners)))
+	mux.Handle("/api/v1/beneficiaries/summary", requireAnyAuthenticated(http.HandlerFunc(workflowHandler.BeneficiariesSummary)))
+	mux.Handle("/api/v1/beneficiaries", requireAnyAuthenticated(http.HandlerFunc(workflowHandler.Beneficiaries)))
+	mux.Handle("/api/v1/distributions/summary", requireAnyAuthenticated(http.HandlerFunc(workflowHandler.DistributionsSummary)))
+	mux.Handle("/api/v1/distributions", requireAnyAuthenticated(http.HandlerFunc(workflowHandler.Distributions)))
 	mux.Handle("/api/v1/users/ping", requireOperator(usersHandler))
 	return mux
 }

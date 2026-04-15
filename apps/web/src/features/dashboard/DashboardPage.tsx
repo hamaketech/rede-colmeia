@@ -10,7 +10,16 @@ import { toast } from "sonner";
 export function DashboardPage() {
   const { t } = useLanguage();
   const { status, error } = useHealth();
-  const { state: metricsState, error: metricsError, transparencySummary, indicators, contributionSummary } = useOpsMetrics();
+  const {
+    state: metricsState,
+    error: metricsError,
+    transparencySummary,
+    indicators,
+    contributionSummary,
+    partnerWorkflowSummary,
+    beneficiaryWorkflowSummary,
+    distributionWorkflowSummary
+  } = useOpsMetrics();
   const statusVariant = status === "ok" ? "success" : "error";
   const formatCount = (value: number | undefined) => (typeof value === "number" ? value.toLocaleString() : "--");
   const impactCards = [
@@ -63,6 +72,29 @@ export function DashboardPage() {
     { label: t("dashboard.pipelinePreparing"), value: indicators?.pipeline.preparing ?? 0 },
     { label: t("dashboard.pipelineDelivery"), value: indicators?.pipeline.inDelivery ?? 0 },
     { label: t("dashboard.pipelineDone"), value: indicators?.pipeline.delivered ?? 0 }
+  ];
+  const workflowCards = [
+    {
+      label: t("dashboard.workflowPartners"),
+      value: formatCount(partnerWorkflowSummary?.active),
+      hint: t("dashboard.workflowPartnersHint"),
+      linkTo: "/partners",
+      linkLabel: t("dashboard.workflowPartnersAction")
+    },
+    {
+      label: t("dashboard.workflowBeneficiaries"),
+      value: formatCount(beneficiaryWorkflowSummary?.validated),
+      hint: t("dashboard.workflowBeneficiariesHint"),
+      linkTo: "/beneficiaries",
+      linkLabel: t("dashboard.workflowBeneficiariesAction")
+    },
+    {
+      label: t("dashboard.workflowDistributions"),
+      value: formatCount(distributionWorkflowSummary?.confirmedBaskets),
+      hint: t("dashboard.workflowDistributionsHint"),
+      linkTo: "/distributions",
+      linkLabel: t("dashboard.workflowDistributionsAction")
+    }
   ];
   const metricsLastUpdated = transparencySummary?.lastUpdated ?? indicators?.lastUpdated;
 
@@ -141,6 +173,24 @@ export function DashboardPage() {
             <section key={step.title} className="stack dashboard-flow-card">
               <strong>{step.title}</strong>
               <p className="dashboard-muted">{step.description}</p>
+            </section>
+          ))}
+        </CardContent>
+      </Card>
+
+      <Card className="dashboard-panel-card">
+        <CardHeader>
+          <CardTitle>{t("dashboard.workflowSectionTitle")}</CardTitle>
+        </CardHeader>
+        <CardContent className="dashboard-grid">
+          {workflowCards.map((card) => (
+            <section key={card.label} className="stack dashboard-flow-card">
+              <p className="dashboard-muted">{card.label}</p>
+              <strong className="dashboard-insight-value">{card.value}</strong>
+              <p className="dashboard-muted">{card.hint}</p>
+              <Button variant="ghost" asChild>
+                <Link to={card.linkTo}>{card.linkLabel}</Link>
+              </Button>
             </section>
           ))}
         </CardContent>

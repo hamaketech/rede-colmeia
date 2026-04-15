@@ -48,6 +48,25 @@ describe("Dashboard page", () => {
         totalMonthlyCents: 2120000,
         totalCapturedCents: 8910000,
         estimatedBasketsPerMonth: 605
+      },
+      partnerWorkflowSummary: {
+        active: 12,
+        pending: 2,
+        paused: 1,
+        regions: 4
+      },
+      beneficiaryWorkflowSummary: {
+        quickValidation: 32,
+        validated: 24,
+        familySize1To2: 10,
+        familySize3To4: 9,
+        familySize5OrMore: 5
+      },
+      distributionWorkflowSummary: {
+        planned: 8,
+        inProgress: 3,
+        confirmed: 11,
+        confirmedBaskets: 240
       }
     });
   });
@@ -64,6 +83,7 @@ describe("Dashboard page", () => {
     expect(screen.getByText("Uma visao clara da sua contribuicao e dos proximos passos da rede.")).toBeInTheDocument();
     expect(screen.getByText("Contribuintes ativos")).toBeInTheDocument();
     expect(screen.getByText("Acoes rapidas")).toBeInTheDocument();
+    expect(screen.getByText("Fluxo de execucao (fase 5)")).toBeInTheDocument();
     expect(screen.getByText("Proximas entregas")).toBeInTheDocument();
     expect(screen.getByText("321")).toBeInTheDocument();
   });

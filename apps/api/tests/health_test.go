@@ -10,6 +10,7 @@ import (
 	"github.com/rede-colmeia/apps/api/internal/modules/auth"
 	"github.com/rede-colmeia/apps/api/internal/modules/ops"
 	"github.com/rede-colmeia/apps/api/internal/modules/users"
+	"github.com/rede-colmeia/apps/api/internal/modules/workflow"
 )
 
 func TestHealthEndpoint(t *testing.T) {
@@ -19,10 +20,12 @@ func TestHealthEndpoint(t *testing.T) {
 	}
 	authHandler := auth.NewHandler(authService, true)
 	opsHandler := ops.NewHandler(ops.NewService(ops.NewInMemoryRepository()))
+	workflowHandler := workflow.NewHandler(workflow.NewService(workflow.NewInMemoryRepository()))
 	handler := apphttp.NewRouter(
 		users.NewHandler(users.NewService(users.NewInMemoryRepository())),
 		authHandler,
 		opsHandler,
+		workflowHandler,
 		authService,
 	)
 	request := httptest.NewRequest(http.MethodGet, "/health", nil)

@@ -672,6 +672,12 @@ select:focus-visible {
   box-shadow: var(--shadow-inset);
 }
 
+.workflow-list-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
 .dashboard-pipeline-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -1175,6 +1181,10 @@ select:focus-visible {
   }
 
   .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .workflow-list-grid {
     grid-template-columns: 1fr;
   }
 

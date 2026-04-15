@@ -13,6 +13,7 @@ import (
 	"github.com/rede-colmeia/apps/api/internal/modules/auth"
 	"github.com/rede-colmeia/apps/api/internal/modules/ops"
 	"github.com/rede-colmeia/apps/api/internal/modules/users"
+	"github.com/rede-colmeia/apps/api/internal/modules/workflow"
 )
 
 func newAuthenticatedHandler() http.Handler {
@@ -29,10 +30,12 @@ func newAuthenticatedHandlerWithResetExposure(exposeResetToken bool) http.Handle
 	}
 	authHandler := auth.NewHandler(authService, exposeResetToken)
 	opsHandler := ops.NewHandler(ops.NewService(ops.NewInMemoryRepository()))
+	workflowHandler := workflow.NewHandler(workflow.NewService(workflow.NewInMemoryRepository()))
 	return apphttp.NewRouter(
 		users.NewHandler(users.NewService(users.NewInMemoryRepository())),
 		authHandler,
 		opsHandler,
+		workflowHandler,
 		authService,
 	)
 }
